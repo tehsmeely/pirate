@@ -14,7 +14,7 @@ where
     Name: RpcName,
 {
     state: Arc<S>,
-    rpcs: HashMap<Name, (TypeId, Box<R>)>,
+    rpcs: HashMap<Name, Box<R>>,
 }
 
 impl<S, Name, R> RPCServer<S, Name, R>
@@ -30,17 +30,14 @@ where
     }
 
     pub fn add_rpc(&mut self, name: Name, rpc_impl: Box<R>) {
-        let type_id = rpc_impl.internal_type_id();
-        self.rpcs.insert(name, (type_id, rpc_impl));
+        self.rpcs.insert(name, rpc_impl);
     }
 
     pub fn call(&self, incoming_bytes: &[u8], incoming_name: &Name, incoming_type_id: TypeId) {
         match self.rpcs.get(incoming_name) {
-            Some((server_side_type_id, rpc_impl)) => {
-                if *server_side_type_id == incoming_type_id {
-                    let mut print_writer = PrintWriter;
-                    rpc_impl.call_of_bytes(incoming_bytes, &self.state, &mut print_writer);
-                }
+            Some(rpc_impl) => {
+                let mut print_writer = PrintWriter;
+                rpc_impl.call_of_bytes(incoming_bytes, &self.state, &mut print_writer);
             }
             None => {
                 println!("Rpc not found: {}", incoming_name)

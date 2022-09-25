@@ -3,6 +3,8 @@ use std::io::Write;
 
 use crate::error::RpcResult;
 use crate::{Bytes, OwnedBytes};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -16,7 +18,7 @@ pub trait ToFromBytes {
 
 pub trait RpcType: Any + ToFromBytes {}
 
-pub trait RpcName: PartialEq + Eq + Hash + Display {}
+pub trait RpcName: PartialEq + Eq + Hash + Serialize + DeserializeOwned + Display {}
 
 pub struct Rpc<Name, Q: RpcType, R: RpcType>
 where
@@ -27,7 +29,7 @@ where
     _response_phantom: PhantomData<R>,
 }
 impl<Name: RpcName, Q: RpcType, R: RpcType> Rpc<Name, Q, R> {
-    fn new(name: Name) -> Self {
+    pub fn new(name: Name) -> Self {
         Self {
             name,
             _query_phantom: PhantomData,
@@ -67,7 +69,6 @@ pub trait StoredRpc<State> {
         state: &State,
         response_writer: impl Write,
     ) -> RpcResult<()>;
-    fn internal_type_id(&self) -> TypeId;
 }
 
 impl<Name: RpcName, State, Q: RpcType, R: RpcType> StoredRpc<State> for RpcImpl<Name, State, Q, R> {
@@ -80,12 +81,8 @@ impl<Name: RpcName, State, Q: RpcType, R: RpcType> StoredRpc<State> for RpcImpl<
         let query = self.query_of_bytes(input_bytes)?;
         let result = self.call(state, query)?;
         let result_bytes = self.result_to_bytes(result)?;
-        //TODO: Support [into] for WriteError
+        //TODO: Support [into] for Write Error
         response_writer.write(&result_bytes).unwrap();
         Ok(())
-    }
-
-    fn internal_type_id(&self) -> TypeId {
-        TypeId::of::<(Q, R)>()
     }
 }

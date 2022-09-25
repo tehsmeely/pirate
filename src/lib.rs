@@ -12,6 +12,7 @@ mod client;
 mod core;
 mod error;
 mod server;
+mod transport;
 
 pub type Bytes<'a> = &'a [u8];
 pub type OwnedBytes = Vec<u8>;
@@ -39,7 +40,7 @@ mod example {
         pub i: usize,
     }
 
-    #[derive(Clone, Hash, Eq, PartialEq, Debug)]
+    #[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
     pub enum HelloWorldRpcName {
         HelloWorld,
     }
@@ -50,8 +51,8 @@ mod example {
     }
     impl RpcName for HelloWorldRpcName {}
 
-    #[derive(Serialize, Deserialize, Debug)]
-    pub struct QR(String);
+    #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+    pub struct QR(pub String);
     impl ToFromBytes for QR {
         fn to_bytes(&self) -> RpcResult<OwnedBytes> {
             serde_pickle::ser::to_vec(&self, serde_pickle::SerOptions::new()).map_err(Into::into)
@@ -63,7 +64,10 @@ mod example {
     }
     impl RpcType for QR {}
 
-    pub fn make_hello_world_rpc() -> RpcImpl<HelloWorldRpcName, HelloWorldState, QR, QR> {
+    pub fn make_hello_world_rpc() -> Rpc<HelloWorldRpcName, QR, QR> {
+        Rpc::new(HelloWorldRpcName::HelloWorld)
+    }
+    pub fn make_hello_world_rpc_impl() -> RpcImpl<HelloWorldRpcName, HelloWorldState, QR, QR> {
         RpcImpl::new(
             HelloWorldRpcName::HelloWorld,
             Box::new(|state, q| {
@@ -84,21 +88,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn full_test() {
+    fn just_server_test() {
         let state = HelloWorldState { i: 3 };
         let mut server = RPCServer::new(Arc::new(state));
         server.add_rpc(
             HelloWorldRpcName::HelloWorld,
-            Box::new(make_hello_world_rpc()),
+            Box::new(make_hello_world_rpc_impl()),
         );
         println!("Full Test");
         let incoming_bytes =
             serde_pickle::ser::to_vec(&"Foo", serde_pickle::SerOptions::new()).unwrap();
         let incoming_type_id = TypeId::of::<(QR, QR)>();
+        let wrong_incoming_type_id = TypeId::of::<(QR, u8)>();
         server.call(
             &incoming_bytes,
             &HelloWorldRpcName::HelloWorld,
             incoming_type_id,
         );
+        server.call(
+            &incoming_bytes,
+            &HelloWorldRpcName::HelloWorld,
+            wrong_incoming_type_id,
+        );
     }
+
+    #[test]
+    fn sync_round_trip() {}
 }
