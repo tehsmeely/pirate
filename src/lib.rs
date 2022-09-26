@@ -71,7 +71,7 @@ mod example {
         RpcImpl::new(
             HelloWorldRpcName::HelloWorld,
             Box::new(|state, q| {
-                println!("Got Called! {:?}", q);
+                println!("Hello World RPC Got Called! Query: {:?}", q);
                 Ok(QR(format!("Hello world: {}:{:?}", state.i, q)))
             }),
         )
@@ -141,13 +141,14 @@ mod tests {
         let mut client_result = None;
 
         while client_result.is_none() {
+            println!(".");
             tokio::select! {
                 _ = server.serve(addr) => {},
                 client_output = client(addr) => {client_result = Some(client_output)},
             }
         }
 
-        let expecting = QR("".into());
+        let expecting = QR("Hello world: 3:QR(\"Foo\")".into());
         assert_eq!(Some(expecting), client_result);
     }
 

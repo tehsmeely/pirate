@@ -36,9 +36,16 @@ where
     }
 
     pub fn call(&self, incoming_bytes: &[u8], incoming_name: &Name) -> RpcResult<OwnedBytes> {
+        println!(". Server.call");
         match self.rpcs.get(incoming_name) {
             Some(rpc_impl) => {
+                println!("Rpc found: {}", incoming_name);
                 let result_bytes = rpc_impl.call_of_bytes(incoming_bytes, &self.state)?;
+                println!(
+                    "RPC Result -> {} Bytes: {:?}",
+                    result_bytes.len(),
+                    result_bytes
+                );
                 Ok(result_bytes)
             }
             None => {
@@ -52,15 +59,21 @@ where
     }
 
     async fn handle_connection(&self, tcp_stream: tokio::net::TcpStream) {
+        println!(". Handle connection");
         let mut transport = {
             let async_trans = TcpTransport::new(tcp_stream);
             Transport::new(async_trans)
         };
         let received_query = transport.receive_query_a().await;
         if let Ok(received_query) = received_query {
+            println!("received query from connection");
             let result_bytes = self
                 .call(&received_query.query_bytes, &received_query.name)
                 .unwrap();
+            println!(
+                "Handle connection: got {} result bytes to respond with",
+                result_bytes.len()
+            );
             transport.respond_a(&result_bytes).await.unwrap();
         }
     }
