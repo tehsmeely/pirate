@@ -86,6 +86,8 @@ mod tests {
 
     use super::example::*;
     use super::*;
+    use crate::client::RpcClient;
+    use crate::transport::{TcpTransport, Transport};
 
     #[test]
     fn just_server_test() {
@@ -100,16 +102,53 @@ mod tests {
             serde_pickle::ser::to_vec(&"Foo", serde_pickle::SerOptions::new()).unwrap();
         let incoming_type_id = TypeId::of::<(QR, QR)>();
         let wrong_incoming_type_id = TypeId::of::<(QR, u8)>();
-        server.call(
-            &incoming_bytes,
-            &HelloWorldRpcName::HelloWorld,
-            incoming_type_id,
+        server.call(&incoming_bytes, &HelloWorldRpcName::HelloWorld);
+        server.call(&incoming_bytes, &HelloWorldRpcName::HelloWorld);
+    }
+
+    #[tokio::test]
+    async fn server_a() {
+        // Server setup
+        println!("Server Setup");
+        let state = HelloWorldState { i: 3 };
+        let mut server = RPCServer::new(Arc::new(state));
+        server.add_rpc(
+            HelloWorldRpcName::HelloWorld,
+            Box::new(make_hello_world_rpc_impl()),
         );
-        server.call(
-            &incoming_bytes,
-            &HelloWorldRpcName::HelloWorld,
-            wrong_incoming_type_id,
-        );
+        let addr = "127.0.0.1:5555";
+        //let server_future = server.serve(addr);
+
+        // Client
+        println!("Client Setup");
+        async fn client(addr: &str) -> QR {
+            let mut transport = {
+                let client_stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+                let async_transport = TcpTransport::new(client_stream);
+                Transport::new(async_transport)
+            };
+
+            let rpc_client = RpcClient::new(make_hello_world_rpc());
+
+            let result = rpc_client
+                .call_a(QR("Foo".into()), &mut transport)
+                .await
+                .unwrap();
+            result
+        }
+        //let client_fut = client(addr);
+
+        let mut client_result = None;
+
+        while client_result.is_none() {
+            tokio::select! {
+                _ = server.serve(addr) => {},
+                client_output = client(addr) => {client_result = Some(client_output)},
+            }
+        }
+
+        let expecting = QR("".into());
+        assert_eq!(Some(expecting), client_result);
     }
 
     #[test]

@@ -63,26 +63,14 @@ impl<Name: RpcName, State, Q: RpcType, R: RpcType> RpcImpl<Name, State, Q, R> {
 }
 
 pub trait StoredRpc<State> {
-    fn call_of_bytes(
-        &self,
-        bytes: Bytes,
-        state: &State,
-        response_writer: impl Write,
-    ) -> RpcResult<()>;
+    fn call_of_bytes(&self, bytes: Bytes, state: &State) -> RpcResult<OwnedBytes>;
 }
 
 impl<Name: RpcName, State, Q: RpcType, R: RpcType> StoredRpc<State> for RpcImpl<Name, State, Q, R> {
-    fn call_of_bytes(
-        &self,
-        input_bytes: Bytes,
-        state: &State,
-        mut response_writer: impl Write,
-    ) -> RpcResult<()> {
+    fn call_of_bytes(&self, input_bytes: Bytes, state: &State) -> RpcResult<OwnedBytes> {
         let query = self.query_of_bytes(input_bytes)?;
         let result = self.call(state, query)?;
         let result_bytes = self.result_to_bytes(result)?;
-        //TODO: Support [into] for Write Error
-        response_writer.write(&result_bytes).unwrap();
-        Ok(())
+        Ok(result_bytes)
     }
 }

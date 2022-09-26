@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::{Rpc, RpcName, RpcType};
 use crate::error::{RpcError, RpcResult};
-use crate::transport::{InternalTransport, Transport};
+use crate::transport::{AsyncInternalTransport, InternalTransport, Transport};
 use crate::{Bytes, OwnedBytes};
 
 pub struct RpcClient<Name: RpcName, Q: RpcType, R: RpcType> {
@@ -13,9 +13,25 @@ pub struct RpcClient<Name: RpcName, Q: RpcType, R: RpcType> {
 }
 
 impl<'de, Name: RpcName, Q: RpcType, R: RpcType> RpcClient<Name, Q, R> {
-    fn call(&self, query: Q, transport: &mut Transport<impl InternalTransport>) -> RpcResult<R> {
+    pub fn new(rpc: Rpc<Name, Q, R>) -> Self {
+        Self { rpc }
+    }
+    pub fn call(
+        &self,
+        query: Q,
+        transport: &mut Transport<impl InternalTransport, Name>,
+    ) -> RpcResult<R> {
         let query_bytes = query.to_bytes()?;
         let result_bytes = transport.send_query(&query_bytes, &self.rpc.name)?;
+        R::of_bytes(&result_bytes)
+    }
+    pub async fn call_a(
+        &self,
+        query: Q,
+        transport: &mut Transport<impl AsyncInternalTransport, Name>,
+    ) -> RpcResult<R> {
+        let query_bytes = query.to_bytes()?;
+        let result_bytes = transport.send_query_a(&query_bytes, &self.rpc.name).await?;
         R::of_bytes(&result_bytes)
     }
 }
@@ -32,7 +48,7 @@ mod tests {
             always_respond_with: "Foo-Bar".to_string(),
             receive_times: 0,
         };
-        let mut transport = Transport::new(internal_transport);
+        let mut transport = Transport::new_sync(internal_transport);
 
         let rpc_client = RpcClient {
             rpc: make_hello_world_rpc(),
