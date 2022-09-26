@@ -1,13 +1,3 @@
-use std::any::{Any, TypeId};
-use std::collections::HashMap;
-use std::error::Error;
-use std::fmt::{Display, Formatter};
-use std::io::Write;
-use std::sync::Arc;
-
-use serde::{Deserialize, Serialize};
-use serde_pickle::{DeOptions, SerOptions};
-
 mod client;
 mod core;
 mod error;
@@ -16,18 +6,6 @@ mod transport;
 
 pub type Bytes<'a> = &'a [u8];
 pub type OwnedBytes = Vec<u8>;
-
-pub struct PrintWriter;
-impl Write for PrintWriter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        println!("PrintWriter. Writing: {}", String::from_utf8_lossy(buf));
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
 
 mod example {
     use crate::core::{Rpc, RpcImpl, RpcName, RpcType, ToFromBytes};
@@ -85,7 +63,6 @@ mod tests {
     use crate::server::RPCServer;
 
     use super::example::*;
-    use super::*;
     use crate::client::RpcClient;
     use crate::transport::{TcpTransport, Transport};
 
@@ -100,10 +77,12 @@ mod tests {
         println!("Full Test");
         let incoming_bytes =
             serde_pickle::ser::to_vec(&"Foo", serde_pickle::SerOptions::new()).unwrap();
-        let incoming_type_id = TypeId::of::<(QR, QR)>();
-        let wrong_incoming_type_id = TypeId::of::<(QR, u8)>();
-        server.call(&incoming_bytes, &HelloWorldRpcName::HelloWorld);
-        server.call(&incoming_bytes, &HelloWorldRpcName::HelloWorld);
+        server
+            .call(&incoming_bytes, &HelloWorldRpcName::HelloWorld)
+            .unwrap();
+        server
+            .call(&incoming_bytes, &HelloWorldRpcName::HelloWorld)
+            .unwrap();
     }
 
     #[tokio::test]
@@ -117,10 +96,7 @@ mod tests {
             Box::new(make_hello_world_rpc_impl()),
         );
         let addr = "127.0.0.1:5555";
-        //let server_future = server.serve(addr);
 
-        // Client
-        println!("Client Setup");
         async fn client(addr: &str) -> QR {
             let mut transport = {
                 let client_stream = tokio::net::TcpStream::connect(addr).await.unwrap();
@@ -136,7 +112,6 @@ mod tests {
                 .unwrap();
             result
         }
-        //let client_fut = client(addr);
 
         let mut client_result = None;
 

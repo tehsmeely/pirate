@@ -8,7 +8,7 @@ use crate::core::{RpcName, StoredRpc};
 use crate::error::{RpcError, RpcResult};
 use crate::example::QR;
 use crate::transport::{AsyncInternalTransport, TcpTransport, Transport};
-use crate::{OwnedBytes, PrintWriter};
+use crate::OwnedBytes;
 
 pub struct RPCServer<S, Name, R>
 where
@@ -58,24 +58,22 @@ where
         }
     }
 
-    async fn handle_connection(&self, tcp_stream: tokio::net::TcpStream) {
+    async fn handle_connection(&self, tcp_stream: tokio::net::TcpStream) -> RpcResult<()> {
         println!(". Handle connection");
         let mut transport = {
             let async_trans = TcpTransport::new(tcp_stream);
             Transport::new(async_trans)
         };
-        let received_query = transport.receive_query_a().await;
-        if let Ok(received_query) = received_query {
-            println!("received query from connection");
-            let result_bytes = self
-                .call(&received_query.query_bytes, &received_query.name)
-                .unwrap();
-            println!(
-                "Handle connection: got {} result bytes to respond with",
-                result_bytes.len()
-            );
-            transport.respond_a(&result_bytes).await.unwrap();
-        }
+        let received_query = transport.receive_query_a().await?;
+        println!("received query from connection");
+        let result_bytes = self
+            .call(&received_query.query_bytes, &received_query.name)
+            .unwrap();
+        println!(
+            "Handle connection: got {} result bytes to respond with",
+            result_bytes.len()
+        );
+        transport.respond_a(&result_bytes).await
     }
 
     pub async fn serve(&self, listen_on: impl tokio::net::ToSocketAddrs + std::fmt::Display) {
@@ -84,8 +82,15 @@ where
 
         println!("Listener started");
         loop {
-            let (tcp_stream, _from) = listener.accept().await.unwrap();
-            self.handle_connection(tcp_stream).await
+            match listener.accept().await {
+                Ok((tcp_stream, _from)) => {
+                    let connection_result = self.handle_connection(tcp_stream).await;
+                    if let Err(e) = connection_result {
+                        println!("Error handling connection: {}", e);
+                    }
+                }
+                Err(e) => println!("TCP Listener error: {}", e),
+            }
         }
     }
 }
