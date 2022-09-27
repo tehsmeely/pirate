@@ -107,7 +107,7 @@ mod tests {
             let rpc_client = RpcClient::new(make_hello_world_rpc());
 
             let result = rpc_client
-                .call_a(QR("Foo".into()), &mut transport)
+                .call(QR("Foo".into()), &mut transport)
                 .await
                 .unwrap();
             result

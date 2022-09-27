@@ -184,14 +184,15 @@ pub struct CannedTestingTransport {
     pub receive_times: usize,
 }
 
-impl InternalTransport for CannedTestingTransport {
-    fn send(&mut self, b: Bytes) {}
+#[async_trait]
+impl AsyncInternalTransport for CannedTestingTransport {
+    async fn send(&mut self, _b: Bytes<'_>) {}
 
-    fn send_and_wait_for_response(&mut self, b: Bytes) -> OwnedBytes {
+    async fn send_and_wait_for_response(&mut self, _b: Bytes<'_>) -> OwnedBytes {
         serde_pickle::to_vec(&self.always_respond_with, serde_pickle::SerOptions::new()).unwrap()
     }
 
-    fn receive(&mut self) -> Option<OwnedBytes> {
+    async fn receive(&mut self) -> Option<OwnedBytes> {
         if self.receive_times > 0 {
             self.receive_times -= 1;
             Some(
@@ -204,30 +205,6 @@ impl InternalTransport for CannedTestingTransport {
     }
 }
 
-pub struct SyncTcpTransport {
-    stream: std::net::TcpStream,
-}
-
-impl InternalTransport for SyncTcpTransport {
-    fn send(&mut self, b: Bytes) {
-        self.stream.write_all(b);
-    }
-
-    fn send_and_wait_for_response(&mut self, b: Bytes) -> OwnedBytes {
-        self.send(b);
-        self.receive().unwrap()
-    }
-
-    fn receive(&mut self) -> Option<OwnedBytes> {
-        let mut buf = [0u8; 1024];
-        match self.stream.read(&mut buf) {
-            Ok(bytes_received) => println!("Received {} bytes", bytes_received),
-            Err(e) => println!("Error reading: {:?}", e),
-        }
-        Some(buf.to_vec())
-    }
-}
-
 pub struct TcpTransport {
     stream: tokio::net::TcpStream,
 }
@@ -235,28 +212,6 @@ pub struct TcpTransport {
 impl TcpTransport {
     pub fn new(stream: tokio::net::TcpStream) -> Self {
         Self { stream }
-    }
-}
-
-impl TcpTransport {
-    async fn receive_dbg(&mut self) -> Option<OwnedBytes> {
-        use tokio::io::AsyncReadExt;
-        let mut buf = [0u8; 1024];
-        println!(">> Receiving (From Send And Receive)");
-        let len = match self.stream.read(&mut buf).await {
-            Ok(bytes_received) => {
-                println!(
-                    ">> Received {} bytes (From Send And Receive)",
-                    bytes_received
-                );
-                bytes_received
-            }
-            Err(e) => {
-                println!(">> Error reading: {:?} (From Send And Receive)", e);
-                0
-            }
-        };
-        Some(buf[0..len].to_vec())
     }
 }
 
@@ -272,7 +227,7 @@ impl AsyncInternalTransport for TcpTransport {
         println!(">> Sending, before waiting for response");
         self.send(b).await;
         println!(">> Sent, waiting for response...");
-        let r = self.receive_dbg().await.unwrap();
+        let r = self.receive().await.unwrap();
         println!(">> Got response.");
         r
     }
