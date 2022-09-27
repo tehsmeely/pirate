@@ -7,12 +7,6 @@ use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 
-pub trait InternalTransport {
-    fn send(&mut self, b: Bytes);
-    fn send_and_wait_for_response(&mut self, b: Bytes) -> OwnedBytes;
-    fn receive(&mut self) -> Option<OwnedBytes>;
-}
-
 #[async_trait]
 pub trait AsyncInternalTransport {
     async fn send(&mut self, b: Bytes<'_>);
@@ -73,14 +67,14 @@ pub struct ReceivedQuery<Name: RpcName> {
 
 pub struct Transport<I, Name> {
     internal_transport: I,
-    _name: PhantomData<Name>,
+    name: PhantomData<Name>,
 }
 
 impl<I: AsyncInternalTransport, Name: RpcName> Transport<I, Name> {
     pub fn new(internal_transport: I) -> Self {
         Self {
             internal_transport,
-            _name: PhantomData::default(),
+            name: PhantomData::default(),
         }
     }
     pub async fn send_query_a(
@@ -130,52 +124,6 @@ impl<I: AsyncInternalTransport, Name: RpcName> Transport<I, Name> {
         println!("Responding with {} Bytes: {:?}", bytes.len(), bytes);
         self.internal_transport.send(bytes).await;
         Ok(())
-    }
-}
-
-/*
-pub struct SyncTransport<I: InternalTransport> {
-    internal_transport: I,
-}
-*/
-
-impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
-    pub fn new_sync(internal_transport: I) -> Self {
-        Self {
-            internal_transport,
-            _name: PhantomData::default(),
-        }
-    }
-    pub fn send_query(&mut self, query_bytes: Bytes, rpc_name: &Name) -> RpcResult<OwnedBytes> {
-        let name_bytes =
-            serde_pickle::ser::to_vec(&rpc_name, serde_pickle::SerOptions::new()).unwrap();
-        let package = TransportPackage {
-            name_bytes: &name_bytes,
-            query_bytes,
-        };
-        let package_bytes =
-            serde_pickle::ser::to_vec(&package, serde_pickle::SerOptions::new()).unwrap();
-        let response_bytes = self
-            .internal_transport
-            .send_and_wait_for_response(&package_bytes);
-        Ok(response_bytes)
-    }
-
-    pub fn receive_query(&mut self) -> RpcResult<ReceivedQuery<Name>> {
-        if let Some(bytes) = self.internal_transport.receive() {
-            let package: TransportPackage =
-                serde_pickle::de::from_slice(&bytes, serde_pickle::DeOptions::new()).unwrap();
-            let name =
-                serde_pickle::de::from_slice(package.name_bytes, serde_pickle::DeOptions::new())
-                    .unwrap();
-            Ok(ReceivedQuery {
-                name,
-                query_bytes: package.query_bytes.to_vec(),
-            })
-        } else {
-            //TODO Rework Custom Error
-            Err(RpcError::Custom("Got no bytes".into()))
-        }
     }
 }
 

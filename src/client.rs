@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::{Rpc, RpcName, RpcType};
 use crate::error::{RpcError, RpcResult};
-use crate::transport::{AsyncInternalTransport, InternalTransport, Transport};
+use crate::transport::{AsyncInternalTransport, Transport};
 use crate::{Bytes, OwnedBytes};
 
 pub struct RpcClient<Name: RpcName, Q: RpcType, R: RpcType> {
