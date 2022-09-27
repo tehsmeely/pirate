@@ -8,7 +8,7 @@ use std::io::{Read, Write};
 use std::marker::PhantomData;
 
 #[async_trait]
-pub trait AsyncInternalTransport {
+pub trait InternalTransport {
     async fn send(&mut self, b: Bytes<'_>);
     async fn send_and_wait_for_response(&mut self, b: Bytes<'_>) -> OwnedBytes;
     async fn receive(&mut self) -> Option<OwnedBytes>;
@@ -70,14 +70,14 @@ pub struct Transport<I, Name> {
     name: PhantomData<Name>,
 }
 
-impl<I: AsyncInternalTransport, Name: RpcName> Transport<I, Name> {
+impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
     pub fn new(internal_transport: I) -> Self {
         Self {
             internal_transport,
             name: PhantomData::default(),
         }
     }
-    pub async fn send_query_a(
+    pub async fn send_query(
         &mut self,
         query_bytes: Bytes<'_>,
         rpc_name: &Name,
@@ -102,7 +102,7 @@ impl<I: AsyncInternalTransport, Name: RpcName> Transport<I, Name> {
         Ok(response_bytes)
     }
 
-    pub async fn receive_query_a(&mut self) -> RpcResult<ReceivedQuery<Name>> {
+    pub async fn receive_query(&mut self) -> RpcResult<ReceivedQuery<Name>> {
         if let Some(bytes) = self.internal_transport.receive().await {
             println!("Received {} Bytes:  {:?}", bytes.len(), bytes);
             let package: TransportPackageOwned =
@@ -120,7 +120,7 @@ impl<I: AsyncInternalTransport, Name: RpcName> Transport<I, Name> {
         }
     }
 
-    pub async fn respond_a(&mut self, bytes: Bytes<'_>) -> RpcResult<()> {
+    pub async fn respond(&mut self, bytes: Bytes<'_>) -> RpcResult<()> {
         println!("Responding with {} Bytes: {:?}", bytes.len(), bytes);
         self.internal_transport.send(bytes).await;
         Ok(())
@@ -133,7 +133,7 @@ pub struct CannedTestingTransport {
 }
 
 #[async_trait]
-impl AsyncInternalTransport for CannedTestingTransport {
+impl InternalTransport for CannedTestingTransport {
     async fn send(&mut self, _b: Bytes<'_>) {}
 
     async fn send_and_wait_for_response(&mut self, _b: Bytes<'_>) -> OwnedBytes {
@@ -164,7 +164,7 @@ impl TcpTransport {
 }
 
 #[async_trait]
-impl AsyncInternalTransport for TcpTransport {
+impl InternalTransport for TcpTransport {
     async fn send(&mut self, b: Bytes<'_>) {
         use tokio::io::AsyncWriteExt;
         println!(">> Just sending {} bytes", b.len());

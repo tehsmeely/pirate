@@ -7,7 +7,7 @@ use serde_pickle::SerOptions;
 use crate::core::{RpcName, StoredRpc};
 use crate::error::{RpcError, RpcResult};
 use crate::example::QR;
-use crate::transport::{AsyncInternalTransport, TcpTransport, Transport};
+use crate::transport::{InternalTransport, TcpTransport, Transport};
 use crate::OwnedBytes;
 
 pub struct RPCServer<S, Name, R>
@@ -35,7 +35,11 @@ where
         self.rpcs.insert(name, rpc_impl);
     }
 
-    pub fn call(&self, incoming_bytes: &[u8], incoming_name: &Name) -> RpcResult<OwnedBytes> {
+    pub(crate) fn call(
+        &self,
+        incoming_bytes: &[u8],
+        incoming_name: &Name,
+    ) -> RpcResult<OwnedBytes> {
         println!(". Server.call");
         match self.rpcs.get(incoming_name) {
             Some(rpc_impl) => {
@@ -64,7 +68,7 @@ where
             let async_trans = TcpTransport::new(tcp_stream);
             Transport::new(async_trans)
         };
-        let received_query = transport.receive_query_a().await?;
+        let received_query = transport.receive_query().await?;
         println!("received query from connection");
         let result_bytes = self
             .call(&received_query.query_bytes, &received_query.name)
@@ -73,7 +77,7 @@ where
             "Handle connection: got {} result bytes to respond with",
             result_bytes.len()
         );
-        transport.respond_a(&result_bytes).await
+        transport.respond(&result_bytes).await
     }
 
     pub async fn serve(&self, listen_on: impl tokio::net::ToSocketAddrs + std::fmt::Display) {
