@@ -10,18 +10,16 @@ use crate::example::QR;
 use crate::transport::{InternalTransport, TcpTransport, Transport};
 use crate::OwnedBytes;
 
-pub struct RPCServer<S, Name, R>
+pub struct RPCServer<S, Name>
 where
-    R: StoredRpc<S>,
     Name: RpcName,
 {
     state: Arc<S>,
-    rpcs: HashMap<Name, Box<R>>,
+    rpcs: HashMap<Name, Box<dyn StoredRpc<S>>>,
 }
 
-impl<S, Name, R> RPCServer<S, Name, R>
+impl<S, Name> RPCServer<S, Name>
 where
-    R: StoredRpc<S>,
     Name: RpcName,
 {
     pub fn new(state: Arc<S>) -> Self {
@@ -31,7 +29,7 @@ where
         }
     }
 
-    pub fn add_rpc(&mut self, name: Name, rpc_impl: Box<R>) {
+    pub fn add_rpc(&mut self, name: Name, rpc_impl: Box<dyn StoredRpc<S>>) {
         self.rpcs.insert(name, rpc_impl);
     }
 

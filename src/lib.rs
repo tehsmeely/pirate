@@ -21,6 +21,7 @@ mod example {
     #[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
     pub enum HelloWorldRpcName {
         HelloWorld,
+        GetI
     }
     impl Display for HelloWorldRpcName {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -42,6 +43,25 @@ mod example {
     }
     impl RpcType for QR {}
 
+    impl ToFromBytes for () {
+        fn to_bytes(&self) -> RpcResult<OwnedBytes> {
+            serde_pickle::ser::to_vec(&self, serde_pickle::SerOptions::new()).map_err(Into::into)
+        }
+        fn of_bytes(b: Bytes) -> RpcResult<Self> {
+            serde_pickle::de::from_slice(b, serde_pickle::DeOptions::new()).map_err(Into::into)
+        }
+    }
+    impl RpcType for () {}
+    impl ToFromBytes for usize {
+        fn to_bytes(&self) -> RpcResult<OwnedBytes> {
+            serde_pickle::ser::to_vec(&self, serde_pickle::SerOptions::new()).map_err(Into::into)
+        }
+        fn of_bytes(b: Bytes) -> RpcResult<Self> {
+            serde_pickle::de::from_slice(b, serde_pickle::DeOptions::new()).map_err(Into::into)
+        }
+    }
+    impl RpcType for usize {}
+
     pub fn make_hello_world_rpc() -> Rpc<HelloWorldRpcName, QR, QR> {
         Rpc::new(HelloWorldRpcName::HelloWorld)
     }
@@ -51,6 +71,19 @@ mod example {
             Box::new(|state, q| {
                 println!("Hello World RPC Got Called! Query: {:?}", q);
                 Ok(QR(format!("Hello world: {}:{:?}", state.i, q)))
+            }),
+        )
+    }
+
+    pub fn make_get_i_rpc() -> Rpc<HelloWorldRpcName, (), usize> {
+        Rpc::new(HelloWorldRpcName::GetI)
+    }
+    pub fn make_get_i_rpc_impl() -> RpcImpl<HelloWorldRpcName, HelloWorldState, (), usize> {
+        RpcImpl::new(
+            HelloWorldRpcName::GetI,
+            Box::new(|state, q| {
+                println!("GetI RPC Got Called! Query: {:?}", q);
+                Ok(state.i)
             }),
         )
     }
@@ -92,8 +125,13 @@ mod tests {
         let state = HelloWorldState { i: 3 };
         let mut server = RPCServer::new(Arc::new(state));
         server.add_rpc(
+            // TODO: Having to supply the name here sucks, it's already baked into the RpcImpl
             HelloWorldRpcName::HelloWorld,
             Box::new(make_hello_world_rpc_impl()),
+        );
+        server.add_rpc(
+            HelloWorldRpcName::GetI,
+            Box::new(make_get_i_rpc_impl()),
         );
         let addr = "127.0.0.1:5555";
 
@@ -112,14 +150,31 @@ mod tests {
                 .unwrap();
             result
         }
+        async fn client2(addr: &str) -> usize {
+            let mut transport = {
+                let client_stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+                let async_transport = TcpTransport::new(client_stream);
+                Transport::new(async_transport)
+            };
+
+            let rpc_client = RpcClient::new(make_get_i_rpc());
+
+            let result = rpc_client
+                .call((), &mut transport)
+                .await
+                .unwrap();
+            result
+        }
 
         let mut client_result = None;
+        let mut client2_result = None;
 
-        while client_result.is_none() {
+        while client_result.is_none() || client2_result.is_none() {
             println!(".");
             tokio::select! {
                 _ = server.serve(addr) => {},
                 client_output = client(addr) => {client_result = Some(client_output)},
+                client2_output = client2(addr) => {client2_result = Some(client2_output)},
             }
         }
 
