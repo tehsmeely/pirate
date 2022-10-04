@@ -21,7 +21,7 @@ mod example {
     #[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
     pub enum HelloWorldRpcName {
         HelloWorld,
-        GetI
+        GetI,
     }
     impl Display for HelloWorldRpcName {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -97,6 +97,7 @@ mod tests {
 
     use super::example::*;
     use crate::client::RpcClient;
+    use crate::core::{Rpc, RpcType};
     use crate::transport::{TcpTransport, Transport};
 
     #[test]
@@ -129,11 +130,27 @@ mod tests {
             HelloWorldRpcName::HelloWorld,
             Box::new(make_hello_world_rpc_impl()),
         );
-        server.add_rpc(
-            HelloWorldRpcName::GetI,
-            Box::new(make_get_i_rpc_impl()),
-        );
+        server.add_rpc(HelloWorldRpcName::GetI, Box::new(make_get_i_rpc_impl()));
         let addr = "127.0.0.1:5555";
+
+        async fn call_client<Q: RpcType, R: RpcType>(
+            addr: &str,
+            q: Q,
+            rpc: Rpc<HelloWorldRpcName, Q, R>,
+        ) -> R {
+            let mut transport = {
+                let client_stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+                let async_transport = TcpTransport::new(client_stream);
+                Transport::new(async_transport)
+            };
+
+            let rpc_client = RpcClient::new(rpc);
+
+            let result = rpc_client.call(q, &mut transport).await.unwrap();
+            result
+        }
+        let hello_world_rpc = make_hello_world_rpc();
+        let get_i_rpc = make_get_i_rpc();
 
         async fn client(addr: &str) -> QR {
             let mut transport = {
@@ -159,27 +176,29 @@ mod tests {
 
             let rpc_client = RpcClient::new(make_get_i_rpc());
 
-            let result = rpc_client
-                .call((), &mut transport)
-                .await
-                .unwrap();
+            let result = rpc_client.call((), &mut transport).await.unwrap();
             result
         }
 
-        let mut client_result = None;
-        let mut client2_result = None;
+        let mut rpc_results = None;
+        let mut client_call_task = tokio::spawn(async move {
+            let r1 = (call_client(addr, QR("foo".into()), hello_world_rpc)).await;
+            let r2 = (call_client(addr, (), get_i_rpc)).await;
+            (r1, r2)
+        });
 
-        while client_result.is_none() || client2_result.is_none() {
+        while rpc_results.is_none() {
             println!(".");
             tokio::select! {
                 _ = server.serve(addr) => {},
-                client_output = client(addr) => {client_result = Some(client_output)},
-                client2_output = client2(addr) => {client2_result = Some(client2_output)},
+                client_output = &mut client_call_task => {rpc_results = Some(client_output)},
             }
         }
 
-        let expecting = QR("Hello world: 3:QR(\"Foo\")".into());
-        assert_eq!(Some(expecting), client_result);
+        let (a, b) = rpc_results.unwrap().unwrap();
+        let expecting = QR("Hello world: 3:QR(\"foo\")".into());
+        assert_eq!(expecting, a);
+        assert_eq!(3usize, b);
     }
 
     #[test]
