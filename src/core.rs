@@ -18,7 +18,7 @@ pub trait ToFromBytes {
 
 pub trait RpcType: Any + ToFromBytes + Clone {}
 
-pub trait RpcName: PartialEq + Eq + Hash + Serialize + DeserializeOwned + Display {}
+pub trait RpcName: PartialEq + Eq + Hash + Serialize + DeserializeOwned + Display + Clone {}
 
 #[derive(Clone)]
 pub struct Rpc<Name, Q: RpcType, R: RpcType> {
@@ -38,7 +38,7 @@ impl<Name: RpcName, Q: RpcType, R: RpcType> Rpc<Name, Q, R> {
 }
 
 pub struct RpcImpl<Name: RpcName, State, Q: RpcType, R: RpcType> {
-    rpc: Rpc<Name, Q, R>,
+    pub rpc: Rpc<Name, Q, R>,
     call: Box<dyn Fn(&mut State, Q) -> RpcResult<R>>,
 }
 
@@ -61,15 +61,22 @@ impl<Name: RpcName, State, Q: RpcType, R: RpcType> RpcImpl<Name, State, Q, R> {
     }
 }
 
-pub trait StoredRpc<State> {
+pub trait StoredRpc<State, Name: RpcName> {
     fn call_of_bytes(&self, bytes: Bytes, state: &mut State) -> RpcResult<OwnedBytes>;
+    fn rpc_name(&self) -> Name;
 }
 
-impl<Name: RpcName, State, Q: RpcType, R: RpcType> StoredRpc<State> for RpcImpl<Name, State, Q, R> {
+impl<Name: RpcName, State, Q: RpcType, R: RpcType> StoredRpc<State, Name>
+    for RpcImpl<Name, State, Q, R>
+{
     fn call_of_bytes(&self, input_bytes: Bytes, state: &mut State) -> RpcResult<OwnedBytes> {
         let query = self.query_of_bytes(input_bytes)?;
         let result = self.call(state, query)?;
         let result_bytes = self.result_to_bytes(result)?;
         Ok(result_bytes)
+    }
+
+    fn rpc_name(&self) -> Name {
+        self.rpc.name.clone()
     }
 }

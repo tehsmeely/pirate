@@ -122,10 +122,7 @@ mod tests {
     fn just_server_test() {
         let state = HelloWorldState { i: 3 };
         let mut server = RPCServer::new(Arc::new(Mutex::new(state)));
-        server.add_rpc(
-            HelloWorldRpcName::HelloWorld,
-            Box::new(make_hello_world_rpc_impl()),
-        );
+        server.add_rpc(Box::new(make_hello_world_rpc_impl()));
         println!("Full Test");
         let incoming_bytes =
             serde_pickle::ser::to_vec(&"Foo", serde_pickle::SerOptions::new()).unwrap();
@@ -144,13 +141,9 @@ mod tests {
         let state = HelloWorldState { i: 3 };
         let state_ref = Arc::new(Mutex::new(state));
         let mut server = RPCServer::new(state_ref);
-        server.add_rpc(
-            // TODO: Having to supply the name here sucks, it's already baked into the RpcImpl
-            HelloWorldRpcName::HelloWorld,
-            Box::new(make_hello_world_rpc_impl()),
-        );
-        server.add_rpc(HelloWorldRpcName::GetI, Box::new(make_get_i_rpc_impl()));
-        server.add_rpc(HelloWorldRpcName::IncrI, Box::new(IncrIRpc::rpc_impl()));
+        server.add_rpc(Box::new(make_hello_world_rpc_impl()));
+        server.add_rpc(Box::new(make_get_i_rpc_impl()));
+        server.add_rpc(Box::new(IncrIRpc::rpc_impl()));
         let addr = "127.0.0.1:5555";
 
         async fn call_client<Q: RpcType, R: RpcType>(

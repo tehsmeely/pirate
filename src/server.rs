@@ -15,7 +15,7 @@ where
     Name: RpcName,
 {
     state: Arc<Mutex<S>>,
-    rpcs: HashMap<Name, Box<dyn StoredRpc<S>>>,
+    rpcs: HashMap<Name, Box<dyn StoredRpc<S, Name>>>,
 }
 
 impl<S, Name> RPCServer<S, Name>
@@ -29,8 +29,9 @@ where
         }
     }
 
-    pub fn add_rpc(&mut self, name: Name, rpc_impl: Box<dyn StoredRpc<S>>) {
-        self.rpcs.insert(name, rpc_impl);
+    pub fn add_rpc(&mut self, stored_rpc: Box<dyn StoredRpc<S, Name>>) {
+        let name = stored_rpc.rpc_name();
+        self.rpcs.insert(name, stored_rpc);
     }
 
     pub(crate) fn call(
