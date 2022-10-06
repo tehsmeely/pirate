@@ -16,18 +16,17 @@ pub trait ToFromBytes {
         Self: Sized;
 }
 
-pub trait RpcType: Any + ToFromBytes {}
+pub trait RpcType: Any + ToFromBytes + Clone {}
 
 pub trait RpcName: PartialEq + Eq + Hash + Serialize + DeserializeOwned + Display {}
 
-pub struct Rpc<Name, Q: RpcType, R: RpcType>
-where
-    Name: RpcName,
-{
+#[derive(Clone)]
+pub struct Rpc<Name, Q: RpcType, R: RpcType> {
     pub name: Name,
     _query_phantom: PhantomData<Q>,
     _response_phantom: PhantomData<R>,
 }
+
 impl<Name: RpcName, Q: RpcType, R: RpcType> Rpc<Name, Q, R> {
     pub fn new(name: Name) -> Self {
         Self {

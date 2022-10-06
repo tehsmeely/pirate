@@ -31,7 +31,7 @@ mod example {
     }
     impl RpcName for HelloWorldRpcName {}
 
-    #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+    #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
     pub struct QR(pub String);
     impl ToFromBytes for QR {
         fn to_bytes(&self) -> RpcResult<OwnedBytes> {
@@ -97,7 +97,7 @@ mod example {
         pub fn rpc_impl() -> RpcImpl<HelloWorldRpcName, HelloWorldState, (), ()> {
             RpcImpl::new(
                 HelloWorldRpcName::IncrI,
-                Box::new(|state| {
+                Box::new(|state, ()| {
                     state.i += 1;
                     Ok(())
                 }),
@@ -115,6 +115,7 @@ mod tests {
     use super::example::*;
     use crate::client::RpcClient;
     use crate::core::{Rpc, RpcType};
+    use crate::example::HelloWorldRpcName::IncrI;
     use crate::transport::{TcpTransport, Transport};
 
     #[test]
@@ -149,6 +150,7 @@ mod tests {
             Box::new(make_hello_world_rpc_impl()),
         );
         server.add_rpc(HelloWorldRpcName::GetI, Box::new(make_get_i_rpc_impl()));
+        server.add_rpc(HelloWorldRpcName::IncrI, Box::new(IncrIRpc::rpc_impl()));
         let addr = "127.0.0.1:5555";
 
         async fn call_client<Q: RpcType, R: RpcType>(
@@ -169,12 +171,17 @@ mod tests {
         }
         let hello_world_rpc = make_hello_world_rpc();
         let get_i_rpc = make_get_i_rpc();
+        let incr_i_rpc = IncrIRpc::rpc();
 
         let mut rpc_results = None;
         let mut client_call_task = tokio::spawn(async move {
-            let r1 = (call_client(addr, QR("foo".into()), hello_world_rpc)).await;
-            let r2 = (call_client(addr, (), get_i_rpc)).await;
-            (r1, r2)
+            let r1 = call_client(addr, QR("foo".into()), hello_world_rpc.clone()).await;
+            let r2 = call_client(addr, (), get_i_rpc.clone()).await;
+            let () = call_client(addr, (), incr_i_rpc.clone()).await;
+            let r3 = call_client(addr, (), get_i_rpc).await;
+            let () = call_client(addr, (), incr_i_rpc).await;
+            let r4 = call_client(addr, QR("bar".into()), hello_world_rpc).await;
+            (r1, r2, r3, r4)
         });
 
         while rpc_results.is_none() {
@@ -185,12 +192,12 @@ mod tests {
             }
         }
 
-        let (a, b) = rpc_results.unwrap().unwrap();
+        let (hello_world_1, get_i_1, get_i_2, hello_world_2) = rpc_results.unwrap().unwrap();
         let expecting = QR("Hello world: 3:QR(\"foo\")".into());
-        assert_eq!(expecting, a);
-        assert_eq!(3usize, b);
+        let expecting2 = QR("Hello world: 5:QR(\"bar\")".into());
+        assert_eq!(expecting, hello_world_1);
+        assert_eq!(3usize, get_i_1);
+        assert_eq!(4usize, get_i_2);
+        assert_eq!(expecting2, hello_world_2);
     }
-
-    #[test]
-    fn sync_round_trip() {}
 }
