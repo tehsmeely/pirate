@@ -22,6 +22,7 @@ mod example {
     pub enum HelloWorldRpcName {
         HelloWorld,
         GetI,
+        IncrI,
     }
     impl Display for HelloWorldRpcName {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -87,11 +88,27 @@ mod example {
             }),
         )
     }
+
+    pub struct IncrIRpc {}
+    impl IncrIRpc {
+        pub fn rpc() -> Rpc<HelloWorldRpcName, (), ()> {
+            Rpc::new(HelloWorldRpcName::IncrI)
+        }
+        pub fn rpc_impl() -> RpcImpl<HelloWorldRpcName, HelloWorldState, (), ()> {
+            RpcImpl::new(
+                HelloWorldRpcName::IncrI,
+                Box::new(|state| {
+                    state.i += 1;
+                    Ok(())
+                }),
+            )
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     use crate::server::RPCServer;
 
@@ -103,7 +120,7 @@ mod tests {
     #[test]
     fn just_server_test() {
         let state = HelloWorldState { i: 3 };
-        let mut server = RPCServer::new(Arc::new(state));
+        let mut server = RPCServer::new(Arc::new(Mutex::new(state)));
         server.add_rpc(
             HelloWorldRpcName::HelloWorld,
             Box::new(make_hello_world_rpc_impl()),
@@ -124,7 +141,8 @@ mod tests {
         // Server setup
         println!("Server Setup");
         let state = HelloWorldState { i: 3 };
-        let mut server = RPCServer::new(Arc::new(state));
+        let state_ref = Arc::new(Mutex::new(state));
+        let mut server = RPCServer::new(state_ref);
         server.add_rpc(
             // TODO: Having to supply the name here sucks, it's already baked into the RpcImpl
             HelloWorldRpcName::HelloWorld,
@@ -151,34 +169,6 @@ mod tests {
         }
         let hello_world_rpc = make_hello_world_rpc();
         let get_i_rpc = make_get_i_rpc();
-
-        async fn client(addr: &str) -> QR {
-            let mut transport = {
-                let client_stream = tokio::net::TcpStream::connect(addr).await.unwrap();
-                let async_transport = TcpTransport::new(client_stream);
-                Transport::new(async_transport)
-            };
-
-            let rpc_client = RpcClient::new(make_hello_world_rpc());
-
-            let result = rpc_client
-                .call(QR("Foo".into()), &mut transport)
-                .await
-                .unwrap();
-            result
-        }
-        async fn client2(addr: &str) -> usize {
-            let mut transport = {
-                let client_stream = tokio::net::TcpStream::connect(addr).await.unwrap();
-                let async_transport = TcpTransport::new(client_stream);
-                Transport::new(async_transport)
-            };
-
-            let rpc_client = RpcClient::new(make_get_i_rpc());
-
-            let result = rpc_client.call((), &mut transport).await.unwrap();
-            result
-        }
 
         let mut rpc_results = None;
         let mut client_call_task = tokio::spawn(async move {

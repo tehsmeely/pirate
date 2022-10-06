@@ -40,11 +40,11 @@ impl<Name: RpcName, Q: RpcType, R: RpcType> Rpc<Name, Q, R> {
 
 pub struct RpcImpl<Name: RpcName, State, Q: RpcType, R: RpcType> {
     rpc: Rpc<Name, Q, R>,
-    call: Box<dyn Fn(&State, Q) -> RpcResult<R>>,
+    call: Box<dyn Fn(&mut State, Q) -> RpcResult<R>>,
 }
 
 impl<Name: RpcName, State, Q: RpcType, R: RpcType> RpcImpl<Name, State, Q, R> {
-    pub fn new(name: Name, call: Box<dyn Fn(&State, Q) -> RpcResult<R>>) -> Self {
+    pub fn new(name: Name, call: Box<dyn Fn(&mut State, Q) -> RpcResult<R>>) -> Self {
         Self {
             rpc: Rpc::new(name),
             call,
@@ -54,7 +54,7 @@ impl<Name: RpcName, State, Q: RpcType, R: RpcType> RpcImpl<Name, State, Q, R> {
     fn query_of_bytes(&self, b: Bytes) -> RpcResult<Q> {
         Q::of_bytes(b)
     }
-    fn call(&self, state: &State, q: Q) -> RpcResult<R> {
+    fn call(&self, state: &mut State, q: Q) -> RpcResult<R> {
         (self.call)(state, q)
     }
     fn result_to_bytes(&self, r: R) -> RpcResult<OwnedBytes> {
@@ -63,11 +63,11 @@ impl<Name: RpcName, State, Q: RpcType, R: RpcType> RpcImpl<Name, State, Q, R> {
 }
 
 pub trait StoredRpc<State> {
-    fn call_of_bytes(&self, bytes: Bytes, state: &State) -> RpcResult<OwnedBytes>;
+    fn call_of_bytes(&self, bytes: Bytes, state: &mut State) -> RpcResult<OwnedBytes>;
 }
 
 impl<Name: RpcName, State, Q: RpcType, R: RpcType> StoredRpc<State> for RpcImpl<Name, State, Q, R> {
-    fn call_of_bytes(&self, input_bytes: Bytes, state: &State) -> RpcResult<OwnedBytes> {
+    fn call_of_bytes(&self, input_bytes: Bytes, state: &mut State) -> RpcResult<OwnedBytes> {
         let query = self.query_of_bytes(input_bytes)?;
         let result = self.call(state, query)?;
         let result_bytes = self.result_to_bytes(result)?;

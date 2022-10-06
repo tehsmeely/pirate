@@ -1,6 +1,6 @@
 use std::any::TypeId;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use serde_pickle::SerOptions;
 
@@ -14,7 +14,7 @@ pub struct RPCServer<S, Name>
 where
     Name: RpcName,
 {
-    state: Arc<S>,
+    state: Arc<Mutex<S>>,
     rpcs: HashMap<Name, Box<dyn StoredRpc<S>>>,
 }
 
@@ -22,7 +22,7 @@ impl<S, Name> RPCServer<S, Name>
 where
     Name: RpcName,
 {
-    pub fn new(state: Arc<S>) -> Self {
+    pub fn new(state: Arc<Mutex<S>>) -> Self {
         Self {
             state,
             rpcs: HashMap::new(),
@@ -42,7 +42,10 @@ where
         match self.rpcs.get(incoming_name) {
             Some(rpc_impl) => {
                 println!("Rpc found: {}", incoming_name);
-                let result_bytes = rpc_impl.call_of_bytes(incoming_bytes, &self.state)?;
+                let result_bytes = {
+                    let mut state = self.state.lock().unwrap();
+                    rpc_impl.call_of_bytes(incoming_bytes, &mut state)?
+                };
                 println!(
                     "RPC Result -> {} Bytes: {:?}",
                     result_bytes.len(),
