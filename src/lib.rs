@@ -89,19 +89,30 @@ mod example {
         )
     }
 
+    pub trait RpcDefinition<Name, State, Q, R>
+    where
+        Name: RpcName,
+        Q: RpcType,
+        R: RpcType,
+    {
+        fn client() -> Rpc<Name, Q, R>;
+        fn server() -> RpcImpl<Name, State, Q, R>;
+    }
+
     pub struct IncrIRpc {}
     impl IncrIRpc {
-        pub fn rpc() -> Rpc<HelloWorldRpcName, (), ()> {
+        fn implement(state: &mut HelloWorldState, _query: ()) -> RpcResult<()> {
+            state.i += 1;
+            Ok(())
+        }
+    }
+    impl RpcDefinition<HelloWorldRpcName, HelloWorldState, (), ()> for IncrIRpc {
+        fn client() -> Rpc<HelloWorldRpcName, (), ()> {
             Rpc::new(HelloWorldRpcName::IncrI)
         }
-        pub fn rpc_impl() -> RpcImpl<HelloWorldRpcName, HelloWorldState, (), ()> {
-            RpcImpl::new(
-                HelloWorldRpcName::IncrI,
-                Box::new(|state, ()| {
-                    state.i += 1;
-                    Ok(())
-                }),
-            )
+
+        fn server() -> RpcImpl<HelloWorldRpcName, HelloWorldState, (), ()> {
+            RpcImpl::new(HelloWorldRpcName::IncrI, Box::new(Self::implement))
         }
     }
 }
@@ -143,7 +154,7 @@ mod tests {
         let mut server = RPCServer::new(state_ref);
         server.add_rpc(Box::new(make_hello_world_rpc_impl()));
         server.add_rpc(Box::new(make_get_i_rpc_impl()));
-        server.add_rpc(Box::new(IncrIRpc::rpc_impl()));
+        server.add_rpc(Box::new(IncrIRpc::server()));
         let addr = "127.0.0.1:5555";
 
         async fn call_client<Q: RpcType, R: RpcType>(
@@ -164,7 +175,7 @@ mod tests {
         }
         let hello_world_rpc = make_hello_world_rpc();
         let get_i_rpc = make_get_i_rpc();
-        let incr_i_rpc = IncrIRpc::rpc();
+        let incr_i_rpc = IncrIRpc::client();
 
         let mut rpc_results = None;
         let mut client_call_task = tokio::spawn(async move {
