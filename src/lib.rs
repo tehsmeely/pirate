@@ -17,6 +17,9 @@ pub use crate::core::RpcType;
 pub use crate::core::StoredRpc;
 pub use crate::server::RpcServer;
 
+#[cfg(feature = "macros")]
+pub use pirate_macro_lib::rpc_definition;
+
 pub trait RpcDefinition<Name: RpcName, State, Q: RpcType, R: RpcType> {
     fn client() -> Rpc<Name, Q, R>;
     fn server() -> RpcImpl<Name, State, Q, R>;
@@ -178,5 +181,42 @@ mod tests {
         assert_eq!(4usize, get_i_2);
         let expecting2: String = "Hello world: 5:String(\"bar\")".into();
         assert_eq!(expecting2, hello_world_2);
+    }
+}
+
+mod example_macro_expand {
+    use serde::{Deserialize, Serialize};
+    #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
+    enum MyName {
+        One,
+    }
+    impl std::fmt::Display for MyName {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match self {
+                MyName::One => write!(f, "One"),
+            }
+        }
+    }
+    impl RpcName for MyName {}
+    struct MyState {}
+    struct Foo {}
+    use crate::error::RpcResult;
+    use crate::RpcName;
+    use std::fmt::Formatter;
+
+    mod pirate {
+        pub use crate::Rpc;
+        pub use crate::RpcDefinition;
+        pub use crate::RpcImpl;
+    }
+
+    #[pirate_macro_lib::rpc_definition]
+    impl Foo {
+        fn name() -> MyName {
+            MyName::One
+        }
+        fn implement(_state: &mut MyState, query: usize) -> RpcResult<String> {
+            Ok(format!("You sent me {}", query))
+        }
     }
 }
