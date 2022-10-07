@@ -1,0 +1,12 @@
+[package]
+name = "pirate-example"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pirate = {path = ".."}
+tokio = {version = "1.21.2", features = ["full"]}
+serde = {version = "1.0.145", features = ["derive"]}
+clap = "4.0.10"

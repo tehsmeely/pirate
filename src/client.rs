@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::{Rpc, RpcName, RpcType};
 use crate::error::{RpcError, RpcResult};
-use crate::transport::{InternalTransport, Transport};
+use crate::transport::{InternalTransport, TcpTransport, Transport};
 use crate::{Bytes, OwnedBytes};
 
 pub struct RpcClient<Name: RpcName, Q: RpcType, R: RpcType> {
@@ -22,6 +22,24 @@ impl<'de, Name: RpcName, Q: RpcType, R: RpcType> RpcClient<Name, Q, R> {
         let result_bytes = transport.send_query(&query_bytes, &self.rpc.name).await?;
         R::of_bytes(&result_bytes)
     }
+}
+
+pub async fn call_client<Name: RpcName, Q: RpcType, R: RpcType>(
+    addr: &str,
+    q: Q,
+    rpc: Rpc<Name, Q, R>,
+) -> R {
+    // TODO: Get rid of unwraps here
+    let mut transport = {
+        let client_stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+        let async_transport = TcpTransport::new(client_stream);
+        Transport::new(async_transport)
+    };
+
+    let rpc_client = RpcClient::new(rpc);
+
+    let result = rpc_client.call(q, &mut transport).await.unwrap();
+    result
 }
 
 #[cfg(test)]

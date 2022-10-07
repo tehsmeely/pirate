@@ -10,7 +10,7 @@ use crate::example::QR;
 use crate::transport::{InternalTransport, TcpTransport, Transport};
 use crate::OwnedBytes;
 
-pub struct RPCServer<S, Name>
+pub struct RpcServer<S, Name>
 where
     Name: RpcName,
 {
@@ -18,7 +18,7 @@ where
     rpcs: HashMap<Name, Box<dyn StoredRpc<S, Name>>>,
 }
 
-impl<S, Name> RPCServer<S, Name>
+impl<S, Name> RpcServer<S, Name>
 where
     Name: RpcName,
 {

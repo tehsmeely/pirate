@@ -1,16 +1,31 @@
 mod client;
 mod core;
-mod error;
+pub mod error;
+pub mod rpc_types;
 mod server;
 mod transport;
 
 pub type Bytes<'a> = &'a [u8];
 pub type OwnedBytes = Vec<u8>;
 
+pub use crate::client::call_client;
+pub use crate::client::RpcClient;
+pub use crate::core::Rpc;
+pub use crate::core::RpcImpl;
+pub use crate::core::RpcName;
+pub use crate::core::RpcType;
+pub use crate::core::StoredRpc;
+pub use crate::server::RpcServer;
+
+pub trait RpcDefinition<Name: RpcName, State, Q: RpcType, R: RpcType> {
+    fn client() -> Rpc<Name, Q, R>;
+    fn server() -> RpcImpl<Name, State, Q, R>;
+}
+
 mod example {
     use crate::core::{Rpc, RpcImpl, RpcName, RpcType, ToFromBytes};
     use crate::error::RpcResult;
-    use crate::{Bytes, OwnedBytes};
+    use crate::{Bytes, OwnedBytes, RpcDefinition};
     use serde::{Deserialize, Serialize};
     use std::fmt::{Display, Formatter};
 
@@ -33,7 +48,7 @@ mod example {
 
     #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
     pub struct QR(pub String);
-    impl ToFromBytes for QR {
+    /*impl ToFromBytes for QR {
         fn to_bytes(&self) -> RpcResult<OwnedBytes> {
             serde_pickle::ser::to_vec(&self, serde_pickle::SerOptions::new()).map_err(Into::into)
         }
@@ -42,8 +57,11 @@ mod example {
             serde_pickle::de::from_slice(b, serde_pickle::DeOptions::new()).map_err(Into::into)
         }
     }
-    impl RpcType for QR {}
 
+     */
+    //impl RpcType for QR {}
+
+    /*
     impl ToFromBytes for () {
         fn to_bytes(&self) -> RpcResult<OwnedBytes> {
             serde_pickle::ser::to_vec(&self, serde_pickle::SerOptions::new()).map_err(Into::into)
@@ -52,7 +70,9 @@ mod example {
             serde_pickle::de::from_slice(b, serde_pickle::DeOptions::new()).map_err(Into::into)
         }
     }
-    impl RpcType for () {}
+     */
+    //impl RpcType for () {}
+    /*
     impl ToFromBytes for usize {
         fn to_bytes(&self) -> RpcResult<OwnedBytes> {
             serde_pickle::ser::to_vec(&self, serde_pickle::SerOptions::new()).map_err(Into::into)
@@ -61,7 +81,8 @@ mod example {
             serde_pickle::de::from_slice(b, serde_pickle::DeOptions::new()).map_err(Into::into)
         }
     }
-    impl RpcType for usize {}
+     */
+    //impl RpcType for usize {}
 
     pub fn make_hello_world_rpc() -> Rpc<HelloWorldRpcName, QR, QR> {
         Rpc::new(HelloWorldRpcName::HelloWorld)
@@ -89,16 +110,6 @@ mod example {
         )
     }
 
-    pub trait RpcDefinition<Name, State, Q, R>
-    where
-        Name: RpcName,
-        Q: RpcType,
-        R: RpcType,
-    {
-        fn client() -> Rpc<Name, Q, R>;
-        fn server() -> RpcImpl<Name, State, Q, R>;
-    }
-
     pub struct IncrIRpc {}
     impl IncrIRpc {
         fn implement(state: &mut HelloWorldState, _query: ()) -> RpcResult<()> {
@@ -121,18 +132,19 @@ mod example {
 mod tests {
     use std::sync::{Arc, Mutex};
 
-    use crate::server::RPCServer;
+    use crate::server::RpcServer;
 
     use super::example::*;
     use crate::client::RpcClient;
     use crate::core::{Rpc, RpcType};
     use crate::example::HelloWorldRpcName::IncrI;
     use crate::transport::{TcpTransport, Transport};
+    use crate::RpcDefinition;
 
     #[test]
     fn just_server_test() {
         let state = HelloWorldState { i: 3 };
-        let mut server = RPCServer::new(Arc::new(Mutex::new(state)));
+        let mut server = RpcServer::new(Arc::new(Mutex::new(state)));
         server.add_rpc(Box::new(make_hello_world_rpc_impl()));
         println!("Full Test");
         let incoming_bytes =
@@ -151,7 +163,7 @@ mod tests {
         println!("Server Setup");
         let state = HelloWorldState { i: 3 };
         let state_ref = Arc::new(Mutex::new(state));
-        let mut server = RPCServer::new(state_ref);
+        let mut server = RpcServer::new(state_ref);
         server.add_rpc(Box::new(make_hello_world_rpc_impl()));
         server.add_rpc(Box::new(make_get_i_rpc_impl()));
         server.add_rpc(Box::new(IncrIRpc::server()));
