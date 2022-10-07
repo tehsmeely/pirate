@@ -46,53 +46,16 @@ mod example {
     }
     impl RpcName for HelloWorldRpcName {}
 
-    #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
-    pub struct QR(pub String);
-    /*impl ToFromBytes for QR {
-        fn to_bytes(&self) -> RpcResult<OwnedBytes> {
-            serde_pickle::ser::to_vec(&self, serde_pickle::SerOptions::new()).map_err(Into::into)
-        }
-
-        fn of_bytes(b: Bytes) -> RpcResult<Self> {
-            serde_pickle::de::from_slice(b, serde_pickle::DeOptions::new()).map_err(Into::into)
-        }
-    }
-
-     */
-    //impl RpcType for QR {}
-
-    /*
-    impl ToFromBytes for () {
-        fn to_bytes(&self) -> RpcResult<OwnedBytes> {
-            serde_pickle::ser::to_vec(&self, serde_pickle::SerOptions::new()).map_err(Into::into)
-        }
-        fn of_bytes(b: Bytes) -> RpcResult<Self> {
-            serde_pickle::de::from_slice(b, serde_pickle::DeOptions::new()).map_err(Into::into)
-        }
-    }
-     */
-    //impl RpcType for () {}
-    /*
-    impl ToFromBytes for usize {
-        fn to_bytes(&self) -> RpcResult<OwnedBytes> {
-            serde_pickle::ser::to_vec(&self, serde_pickle::SerOptions::new()).map_err(Into::into)
-        }
-        fn of_bytes(b: Bytes) -> RpcResult<Self> {
-            serde_pickle::de::from_slice(b, serde_pickle::DeOptions::new()).map_err(Into::into)
-        }
-    }
-     */
-    //impl RpcType for usize {}
-
-    pub fn make_hello_world_rpc() -> Rpc<HelloWorldRpcName, QR, QR> {
+    pub fn make_hello_world_rpc() -> Rpc<HelloWorldRpcName, String, String> {
         Rpc::new(HelloWorldRpcName::HelloWorld)
     }
-    pub fn make_hello_world_rpc_impl() -> RpcImpl<HelloWorldRpcName, HelloWorldState, QR, QR> {
+    pub fn make_hello_world_rpc_impl() -> RpcImpl<HelloWorldRpcName, HelloWorldState, String, String>
+    {
         RpcImpl::new(
             HelloWorldRpcName::HelloWorld,
             Box::new(|state, q| {
                 println!("Hello World RPC Got Called! Query: {:?}", q);
-                Ok(QR(format!("Hello world: {}:{:?}", state.i, q)))
+                Ok(format!("Hello world: {}:{:?}", state.i, q))
             }),
         )
     }
@@ -191,12 +154,12 @@ mod tests {
 
         let mut rpc_results = None;
         let mut client_call_task = tokio::spawn(async move {
-            let r1 = call_client(addr, QR("foo".into()), hello_world_rpc.clone()).await;
+            let r1 = call_client(addr, "foo".into(), hello_world_rpc.clone()).await;
             let r2 = call_client(addr, (), get_i_rpc.clone()).await;
             let () = call_client(addr, (), incr_i_rpc.clone()).await;
             let r3 = call_client(addr, (), get_i_rpc).await;
             let () = call_client(addr, (), incr_i_rpc).await;
-            let r4 = call_client(addr, QR("bar".into()), hello_world_rpc).await;
+            let r4 = call_client(addr, "bar".into(), hello_world_rpc).await;
             (r1, r2, r3, r4)
         });
 
@@ -209,11 +172,11 @@ mod tests {
         }
 
         let (hello_world_1, get_i_1, get_i_2, hello_world_2) = rpc_results.unwrap().unwrap();
-        let expecting = QR("Hello world: 3:QR(\"foo\")".into());
-        let expecting2 = QR("Hello world: 5:QR(\"bar\")".into());
+        let expecting: String = "Hello world: 3:String(\"foo\")".into();
         assert_eq!(expecting, hello_world_1);
         assert_eq!(3usize, get_i_1);
         assert_eq!(4usize, get_i_2);
+        let expecting2: String = "Hello world: 5:String(\"bar\")".into();
         assert_eq!(expecting2, hello_world_2);
     }
 }

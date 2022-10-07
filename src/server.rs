@@ -6,7 +6,6 @@ use serde_pickle::SerOptions;
 
 use crate::core::{RpcName, StoredRpc};
 use crate::error::{RpcError, RpcResult};
-use crate::example::QR;
 use crate::transport::{InternalTransport, TcpTransport, Transport};
 use crate::OwnedBytes;
 

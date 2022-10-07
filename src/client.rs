@@ -45,7 +45,7 @@ pub async fn call_client<Name: RpcName, Q: RpcType, R: RpcType>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::example::{make_hello_world_rpc, QR};
+    use crate::example::make_hello_world_rpc;
     use crate::transport::CannedTestingTransport;
 
     #[tokio::test]
@@ -60,11 +60,8 @@ mod tests {
             rpc: make_hello_world_rpc(),
         };
 
-        let result = rpc_client
-            .call(QR("Foo".into()), &mut transport)
-            .await
-            .unwrap();
+        let result = rpc_client.call("Foo".into(), &mut transport).await.unwrap();
 
-        assert_eq!(QR("Foo-Bar".into()), result);
+        assert_eq!(String::from("Foo-Bar"), result);
     }
 }
