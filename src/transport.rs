@@ -4,7 +4,6 @@ use crate::error::{RpcError, RpcResult};
 use crate::{Bytes, OwnedBytes};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::io::{Read, Write};
 use std::marker::PhantomData;
 
 #[async_trait]
@@ -30,6 +29,7 @@ struct TransportPackageOwned {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::HelloWorldRpcName;
     #[test]
     fn transport_package_round_trip() {
         let name = HelloWorldRpcName::HelloWorld;
@@ -168,6 +168,7 @@ impl InternalTransport for TcpTransport {
     async fn send(&mut self, b: Bytes<'_>) {
         use tokio::io::AsyncWriteExt;
         println!(">> Just sending {} bytes", b.len());
+        // TODO, handle error case in writing
         self.stream.write_all(b).await;
     }
 

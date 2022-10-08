@@ -25,12 +25,17 @@ pub trait RpcDefinition<Name: RpcName, State, Q: RpcType, R: RpcType> {
     fn server() -> RpcImpl<Name, State, Q, R>;
 }
 
-mod example {
+#[cfg(test)]
+mod tests {
+    use crate::client::{call_client, RpcClient};
     use crate::core::{Rpc, RpcImpl, RpcName};
     use crate::error::RpcResult;
-    use crate::{RpcDefinition};
+    use crate::server::RpcServer;
+    use crate::transport::{TcpTransport, Transport};
+    use crate::{RpcDefinition, RpcType};
     use serde::{Deserialize, Serialize};
     use std::fmt::{Display, Formatter};
+    use std::sync::{Arc, Mutex};
 
     pub struct HelloWorldState {
         pub i: usize,
@@ -92,20 +97,6 @@ mod example {
             RpcImpl::new(HelloWorldRpcName::IncrI, Box::new(Self::implement))
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::{Arc, Mutex};
-
-    use crate::server::RpcServer;
-
-    use super::example::*;
-    use crate::client::RpcClient;
-    use crate::core::{Rpc, RpcType};
-    
-    use crate::transport::{TcpTransport, Transport};
-    use crate::RpcDefinition;
 
     #[test]
     fn just_server_test() {
@@ -135,22 +126,6 @@ mod tests {
         server.add_rpc(Box::new(IncrIRpc::server()));
         let addr = "127.0.0.1:5555";
 
-        async fn call_client<Q: RpcType, R: RpcType>(
-            addr: &str,
-            q: Q,
-            rpc: Rpc<HelloWorldRpcName, Q, R>,
-        ) -> R {
-            let mut transport = {
-                let client_stream = tokio::net::TcpStream::connect(addr).await.unwrap();
-                let async_transport = TcpTransport::new(client_stream);
-                Transport::new(async_transport)
-            };
-
-            let rpc_client = RpcClient::new(rpc);
-
-            let result = rpc_client.call(q, &mut transport).await.unwrap();
-            result
-        }
         let hello_world_rpc = make_hello_world_rpc();
         let get_i_rpc = make_get_i_rpc();
         let incr_i_rpc = IncrIRpc::client();
@@ -181,42 +156,5 @@ mod tests {
         assert_eq!(4usize, get_i_2);
         let expecting2: String = "Hello world: 5:\"bar\"".into();
         assert_eq!(expecting2, hello_world_2);
-    }
-}
-
-mod example_macro_expand {
-    use serde::{Deserialize, Serialize};
-    #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
-    enum MyName {
-        One,
-    }
-    impl std::fmt::Display for MyName {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            match self {
-                MyName::One => write!(f, "One"),
-            }
-        }
-    }
-    impl RpcName for MyName {}
-    struct MyState {}
-    struct Foo {}
-    use crate::error::RpcResult;
-    use crate::RpcName;
-    use std::fmt::Formatter;
-
-    mod pirates {
-        pub use crate::Rpc;
-        pub use crate::RpcDefinition;
-        pub use crate::RpcImpl;
-    }
-
-    #[pirates_macro_lib::rpc_definition]
-    impl Foo {
-        fn name() -> MyName {
-            MyName::One
-        }
-        fn implement(_state: &mut MyState, query: usize) -> RpcResult<String> {
-            Ok(format!("You sent me {}", query))
-        }
     }
 }

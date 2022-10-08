@@ -1,9 +1,6 @@
-
-
 use crate::core::{Rpc, RpcName, RpcType};
-use crate::error::{RpcResult};
+use crate::error::RpcResult;
 use crate::transport::{InternalTransport, TcpTransport, Transport};
-
 
 pub struct RpcClient<Name: RpcName, Q: RpcType, R: RpcType> {
     rpc: Rpc<Name, Q, R>,
@@ -45,7 +42,7 @@ pub async fn call_client<Name: RpcName, Q: RpcType, R: RpcType>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::example::make_hello_world_rpc;
+    use crate::tests::make_hello_world_rpc;
     use crate::transport::CannedTestingTransport;
 
     #[tokio::test]
