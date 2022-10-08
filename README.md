@@ -1,5 +1,5 @@
 # Pirates!
-*Rust ArrrrPC Lib* ![pirate](resources/pirate.png)
+![pirate](resources/pirate.png) *Rust ArrrrPC Lib* 
 
 [![Build Status](https://github.com/tehsmeely/pirate/workflows/CI/badge.svg)](https://github.com/tehsmeely/pirate/actions)
 [![Current Crates.io Version](https://img.shields.io/crates/v/pirates.svg)](https://crates.io/crates/pirates)
