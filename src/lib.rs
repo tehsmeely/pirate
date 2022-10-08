@@ -175,11 +175,11 @@ mod tests {
         }
 
         let (hello_world_1, get_i_1, get_i_2, hello_world_2) = rpc_results.unwrap().unwrap();
-        let expecting: String = "Hello world: 3:String(\"foo\")".into();
+        let expecting: String = "Hello world: 3:\"foo\"".into();
         assert_eq!(expecting, hello_world_1);
         assert_eq!(3usize, get_i_1);
         assert_eq!(4usize, get_i_2);
-        let expecting2: String = "Hello world: 5:String(\"bar\")".into();
+        let expecting2: String = "Hello world: 5:\"bar\"".into();
         assert_eq!(expecting2, hello_world_2);
     }
 }
