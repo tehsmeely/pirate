@@ -18,7 +18,7 @@ pub use crate::core::StoredRpc;
 pub use crate::server::RpcServer;
 
 #[cfg(feature = "macros")]
-pub use pirate_macro_lib::rpc_definition;
+pub use pirates_macro_lib::rpc_definition;
 
 pub trait RpcDefinition<Name: RpcName, State, Q: RpcType, R: RpcType> {
     fn client() -> Rpc<Name, Q, R>;
@@ -204,13 +204,13 @@ mod example_macro_expand {
     use crate::RpcName;
     use std::fmt::Formatter;
 
-    mod pirate {
+    mod pirates {
         pub use crate::Rpc;
         pub use crate::RpcDefinition;
         pub use crate::RpcImpl;
     }
 
-    #[pirate_macro_lib::rpc_definition]
+    #[pirates_macro_lib::rpc_definition]
     impl Foo {
         fn name() -> MyName {
             MyName::One
