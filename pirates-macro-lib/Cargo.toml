@@ -2,6 +2,11 @@
 name = "pirates_macro_lib"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Proc macros for pirates lib"
+homepage = "https://github.com/tehsmeely/pirates"
+repository = "https://github.com/tehsmeely/pirates"
+readme = "README.md"
 
 [lib]
 name = "pirates_macro_lib"
