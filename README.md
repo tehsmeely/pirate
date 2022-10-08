@@ -7,6 +7,7 @@
 
 Pirates, a simple and straightforward interface for serving and calling RPCs from async rust programs
 
+![pirate](resources/pirate.png)
 
 Define an RPC
 ```rust
