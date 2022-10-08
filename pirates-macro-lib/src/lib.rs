@@ -1,12 +1,9 @@
-use proc_macro::{Ident, Span, TokenStream};
+use proc_macro::TokenStream;
 use quote::quote;
-use syn::{
-    parse_macro_input, AttributeArgs, ImplItem, ImplItemConst, ImplItemMethod, ItemImpl,
-    ReturnType, Type,
-};
+use syn::{parse_macro_input, AttributeArgs, ImplItem, ImplItemMethod, ItemImpl, ReturnType, Type};
 
 /*
-The macro should take:
+The macro takes:
 
     pub struct RPCIMPL {}
     impl RPCIMPL {
@@ -25,9 +22,7 @@ and generates an extra impl block:
             RpcImpl::new(Self::name(), Box::new(Self::implement))
         }
     }
-
-
- */
+*/
 
 fn find_fn_by_name<'a, 'b>(name: &'b str, items: &'a Vec<ImplItem>) -> Option<&'a ImplItemMethod> {
     for item in items {
@@ -123,13 +118,13 @@ pub fn rpc_definition(args: TokenStream, item: TokenStream) -> TokenStream {
 
     // generate trait impl block
     let new_block: TokenStream = quote! {
-        impl pirate::RpcDefinition<#ty_name, #ty_state, #ty_query, #ty_response> for #ty_rpc_impl {
-            fn client() -> pirate::Rpc<#ty_name, #ty_query, #ty_response> {
-                pirate::Rpc::new(Self::name())
+        impl pirates::RpcDefinition<#ty_name, #ty_state, #ty_query, #ty_response> for #ty_rpc_impl {
+            fn client() -> pirates::Rpc<#ty_name, #ty_query, #ty_response> {
+                pirates::Rpc::new(Self::name())
             }
 
-            fn server() -> pirate::RpcImpl<#ty_name, #ty_state, #ty_query, #ty_response> {
-                pirate::RpcImpl::new(Self::name(), std::boxed::Box::new(Self::implement))
+            fn server() -> pirates::RpcImpl<#ty_name, #ty_state, #ty_query, #ty_response> {
+                pirates::RpcImpl::new(Self::name(), std::boxed::Box::new(Self::implement))
             }
         }
     }

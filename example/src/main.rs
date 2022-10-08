@@ -1,5 +1,5 @@
 use clap::{arg, value_parser};
-use pirate::{call_client, RpcDefinition, RpcName, RpcServer};
+use pirates::{call_client, RpcDefinition, RpcName, RpcServer};
 use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
 use std::sync::{Arc, Mutex};
@@ -100,11 +100,10 @@ async fn print_names_cli(addr: &str) {
 
 mod rpcs {
     use crate::{RpcId, ServerState};
-    use pirate::error::RpcResult;
-    use pirate::{Rpc, RpcDefinition, RpcImpl};
+    use pirates::{error::RpcResult, Rpc, RpcDefinition, RpcImpl};
 
     pub struct AddName {}
-    #[pirate::rpc_definition]
+    #[pirates::rpc_definition]
     impl AddName {
         fn name() -> RpcId {
             RpcId::AddName
@@ -116,7 +115,7 @@ mod rpcs {
     }
 
     pub struct GetNames {}
-    #[pirate::rpc_definition]
+    #[pirates::rpc_definition]
     impl GetNames {
         fn name() -> RpcId {
             RpcId::GetNames

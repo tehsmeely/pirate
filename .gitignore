@@ -3,6 +3,6 @@
 /example/target
 /example/Cargo.lock
 /example/.idea
-/pirate-macro-lib/target
-/pirate-macro-lib/Cargo.lock
-/pirate-macro-lib/.idea
+/pirates-macro-lib/target
+/pirates-macro-lib/Cargo.lock
+/pirates-macro-lib/.idea
