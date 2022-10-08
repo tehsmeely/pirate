@@ -1,0 +1,1 @@
+Proc macro lib for [pirates](https://github.com/tehsmeely/pirates)
