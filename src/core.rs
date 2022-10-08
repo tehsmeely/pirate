@@ -1,10 +1,9 @@
-use std::any::{Any};
-
+use std::any::Any;
 
 use crate::error::RpcResult;
 use crate::{Bytes, OwnedBytes};
 use serde::de::DeserializeOwned;
-use serde::{Serialize};
+use serde::Serialize;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::marker::PhantomData;
