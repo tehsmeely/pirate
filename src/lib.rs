@@ -58,7 +58,7 @@
 //! ```rust,no_run
 //! let addr = "127.0.0.1:5959";
 //! let name = String::from("Gaspode the wonder dog");
-//! pirate::call_client(addr, name, rpcs::AddName::client()).await;
+//! pirates::call_client(addr, name, rpcs::AddName::client()).await;
 //! ```
 
 mod client;
