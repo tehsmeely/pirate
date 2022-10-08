@@ -3,6 +3,7 @@ use crate::error::{RpcError, RpcResult};
 
 use crate::{Bytes, OwnedBytes};
 use async_trait::async_trait;
+use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
@@ -90,8 +91,8 @@ impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
         };
         let package_bytes =
             serde_pickle::ser::to_vec(&package, serde_pickle::SerOptions::new()).unwrap();
-        println!(
-            "Sending {} Bytes:  {:?}",
+        debug!(
+            "Transport sending {} Bytes:  {:?}",
             package_bytes.len(),
             package_bytes
         );
@@ -104,7 +105,7 @@ impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
 
     pub async fn receive_query(&mut self) -> RpcResult<ReceivedQuery<Name>> {
         if let Some(bytes) = self.internal_transport.receive().await {
-            println!("Received {} Bytes:  {:?}", bytes.len(), bytes);
+            debug!("Transport {} Bytes:  {:?}", bytes.len(), bytes);
             let package: TransportPackageOwned =
                 serde_pickle::de::from_slice(&bytes, serde_pickle::DeOptions::new()).unwrap();
             let name =
@@ -121,7 +122,6 @@ impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
     }
 
     pub async fn respond(&mut self, bytes: Bytes<'_>) -> RpcResult<()> {
-        println!("Responding with {} Bytes: {:?}", bytes.len(), bytes);
         self.internal_transport.send(bytes).await;
         Ok(())
     }
@@ -167,31 +167,23 @@ impl TcpTransport {
 impl InternalTransport for TcpTransport {
     async fn send(&mut self, b: Bytes<'_>) {
         use tokio::io::AsyncWriteExt;
-        println!(">> Just sending {} bytes", b.len());
         // TODO, handle error case in writing
         self.stream.write_all(b).await.unwrap();
     }
 
     async fn send_and_wait_for_response(&mut self, b: Bytes<'_>) -> OwnedBytes {
-        println!(">> Sending, before waiting for response");
         self.send(b).await;
-        println!(">> Sent, waiting for response...");
-        let r = self.receive().await.unwrap();
-        println!(">> Got response.");
-        r
+        let r = self.receive().await;
+        r.unwrap()
     }
 
     async fn receive(&mut self) -> Option<OwnedBytes> {
         use tokio::io::AsyncReadExt;
         let mut buf = [0u8; 1024];
-        println!(">> Receiving");
         let len = match self.stream.read(&mut buf).await {
-            Ok(bytes_received) => {
-                println!(">> Received {} bytes", bytes_received);
-                bytes_received
-            }
+            Ok(bytes_received) => bytes_received,
             Err(e) => {
-                println!(">> Error reading: {:?}", e);
+                error!(">> Error reading: {:?}", e);
                 0
             }
         };

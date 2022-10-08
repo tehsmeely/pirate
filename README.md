@@ -11,7 +11,7 @@ Pirates, a simple and straightforward interface for serving and calling RPCs fro
 Define an RPC
 ```rust
     pub struct AddName {}
-    #[pirate::rpc_definition]
+    #[pirates::rpc_definition]
     impl AddName {
         fn name() -> RpcId {
             RpcId::AddName
@@ -51,5 +51,4 @@ separately to add and print names. See the README in that directory for more inf
 
 
 ## License
-
-TBD?
+Apache-2.0 Or MIT 
