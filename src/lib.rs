@@ -1,7 +1,70 @@
+//! Pirates - a straightforward ArrrrPC library
+//!
+//! The core of things in the RPC definition itself.
+//! you achieve this by implementing `RpcDefinition` on a struct of your choice.
+//! the `#[pirates::rpc_definition]` macro can do this for you on an impl that
+//! contains a run and implement function (Enable the "macros" feature)
+//!
+//! ```rust,no_run
+//! pub struct AddName {}
+//! #[pirates::rpc_definition]
+//! impl AddName {
+//!     fn name() -> RpcId {
+//!         RpcId::AddName
+//!     }
+//!     fn implement(state: &mut ServerState, query: String) -> RpcResult<()> {
+//!         state.names.push(query);
+//!         Ok(())
+//!     }
+//! }
+//! ```
+//!
+//! There are two core types these are generic over which you need to define:
+//! 1) Rpc Identifier. Create a type which implements RpcName
+//! ```rust,no_run
+//! #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
+//! enum RpcId {
+//!     AddName,
+//!     GetNames,
+//! }
+//! impl std::fmt::Display for RpcId {
+//!     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//!         match self {
+//!             Self::AddName => write!(f, "AddName"),
+//!             Self::GetNames => write!(f, "GetNames"),
+//!         }
+//!     }
+//! }
+//! ```
+//! 2) Server state. Any type inside an Arc<Mutex<T> that the server can hand to RPCs
+//! ```rust,no_run
+//! struct ServerState {
+//!     names: Vec<String>,
+//! }
+//! ```
+//!
+//!
+//! When you have an rpc definition, you can now serve it.
+//! Serving is done by creating an `RpcServer` and awaiting its `serve` method
+//!
+//! ```rust,no_run
+//! let mut server = RpcServer::new(state.clone());
+//! server.add_rpc(Box::new(rpcs::AddName::server()));
+//! server.serve("127.0.0.1:5959").await;
+//! ```
+//!
+//!
+//! Elsewhere, to call it, use the `call_client` function with access to the RPC
+//! ```rust,no_run
+//! let addr = "127.0.0.1:5959";
+//! let name = String::from("Gaspode the wonder dog");
+//! pirate::call_client(addr, name, rpcs::AddName::client()).await;
+//! ```
+
 mod client;
 mod core;
 pub mod error;
-pub mod rpc_types;
+mod rpc_types;
 mod server;
 mod transport;
 
