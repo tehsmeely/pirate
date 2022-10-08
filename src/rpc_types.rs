@@ -1,7 +1,7 @@
 use crate::core::{RpcType, ToFromBytes};
 use crate::error::RpcResult;
 use crate::{Bytes, OwnedBytes};
-use serde::de::DeserializeOwned;
+
 use serde::{Deserialize, Serialize};
 
 /// Premade RPC Type implementations for core types to avoid habing to new-type all the time

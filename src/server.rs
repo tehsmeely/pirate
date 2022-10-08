@@ -1,12 +1,12 @@
-use std::any::TypeId;
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use serde_pickle::SerOptions;
+
 
 use crate::core::{RpcName, StoredRpc};
 use crate::error::{RpcError, RpcResult};
-use crate::transport::{InternalTransport, TcpTransport, Transport};
+use crate::transport::{TcpTransport, Transport};
 use crate::OwnedBytes;
 
 pub struct RpcServer<S, Name>

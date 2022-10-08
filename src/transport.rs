@@ -1,6 +1,6 @@
 use crate::core::RpcName;
 use crate::error::{RpcError, RpcResult};
-use crate::example::HelloWorldRpcName;
+
 use crate::{Bytes, OwnedBytes};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -46,14 +46,14 @@ mod tests {
             query_bytes: &query_bytes,
         };
 
-        let package_bytes = serde_pickle::to_vec(&package, sero.clone()).unwrap();
+        let package_bytes = serde_pickle::to_vec(&package, sero).unwrap();
 
         let package2: TransportPackageOwned =
             serde_pickle::from_slice(&package_bytes, deo.clone()).unwrap();
 
         let name2: HelloWorldRpcName =
             serde_pickle::from_slice(&package2.name_bytes, deo.clone()).unwrap();
-        let query2: String = serde_pickle::from_slice(&package2.query_bytes, deo.clone()).unwrap();
+        let query2: String = serde_pickle::from_slice(&package2.query_bytes, deo).unwrap();
 
         assert_eq!(name, name2);
         assert_eq!(query, query2);

@@ -26,9 +26,9 @@ pub trait RpcDefinition<Name: RpcName, State, Q: RpcType, R: RpcType> {
 }
 
 mod example {
-    use crate::core::{Rpc, RpcImpl, RpcName, RpcType, ToFromBytes};
+    use crate::core::{Rpc, RpcImpl, RpcName};
     use crate::error::RpcResult;
-    use crate::{Bytes, OwnedBytes, RpcDefinition};
+    use crate::{RpcDefinition};
     use serde::{Deserialize, Serialize};
     use std::fmt::{Display, Formatter};
 
@@ -103,7 +103,7 @@ mod tests {
     use super::example::*;
     use crate::client::RpcClient;
     use crate::core::{Rpc, RpcType};
-    use crate::example::HelloWorldRpcName::IncrI;
+    
     use crate::transport::{TcpTransport, Transport};
     use crate::RpcDefinition;
 
@@ -159,9 +159,9 @@ mod tests {
         let mut client_call_task = tokio::spawn(async move {
             let r1 = call_client(addr, "foo".into(), hello_world_rpc.clone()).await;
             let r2 = call_client(addr, (), get_i_rpc.clone()).await;
-            let () = call_client(addr, (), incr_i_rpc.clone()).await;
+            call_client(addr, (), incr_i_rpc.clone()).await;
             let r3 = call_client(addr, (), get_i_rpc).await;
-            let () = call_client(addr, (), incr_i_rpc).await;
+            call_client(addr, (), incr_i_rpc).await;
             let r4 = call_client(addr, "bar".into(), hello_world_rpc).await;
             (r1, r2, r3, r4)
         });
