@@ -32,8 +32,11 @@ Serve it
 Call it
 ```rust
     let addr = "200.1.3.7:5959";
-    let name = "Gaspode the wonder dog";
+    let name = String::from("Gaspode the wonder dog");
     pirate::call_client(addr, name, rpcs::AddName::client()).await;
+
+    let names = call_client(addr, (), rpcs::GetNames::client()).await;
+    assert_eq!(vec![String::from("Gaspode the wonder dog")], names);
 ```
 
 ## Documentation
