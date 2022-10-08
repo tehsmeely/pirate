@@ -2,6 +2,7 @@
 ![pirate](resources/pirate.png) *Rust ArrrrPC Lib* 
 
 [![CI](https://github.com/tehsmeely/pirates/actions/workflows/ci.yml/badge.svg)](https://github.com/tehsmeely/pirates/actions/workflows/ci.yml)
+[![docs](https://docs.rs/pirates/badge.svg)](https://docs.rs/pirates/)
 [![Current Crates.io Version](https://img.shields.io/crates/v/pirates.svg)](https://crates.io/crates/pirates)
 
 
