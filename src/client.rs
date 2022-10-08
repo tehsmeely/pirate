@@ -35,8 +35,8 @@ pub async fn call_client<Name: RpcName, Q: RpcType, R: RpcType>(
 
     let rpc_client = RpcClient::new(rpc);
 
-    let result = rpc_client.call(q, &mut transport).await.unwrap();
-    result
+    let result = rpc_client.call(q, &mut transport).await;
+    result.unwrap()
 }
 
 #[cfg(test)]

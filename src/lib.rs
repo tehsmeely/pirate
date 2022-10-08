@@ -27,12 +27,11 @@ pub trait RpcDefinition<Name: RpcName, State, Q: RpcType, R: RpcType> {
 
 #[cfg(test)]
 mod tests {
-    use crate::client::{call_client, RpcClient};
+    use crate::client::call_client;
     use crate::core::{Rpc, RpcImpl, RpcName};
     use crate::error::RpcResult;
     use crate::server::RpcServer;
-    use crate::transport::{TcpTransport, Transport};
-    use crate::{RpcDefinition, RpcType};
+    use crate::RpcDefinition;
     use serde::{Deserialize, Serialize};
     use std::fmt::{Display, Formatter};
     use std::sync::{Arc, Mutex};

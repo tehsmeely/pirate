@@ -36,13 +36,15 @@ impl<Name: RpcName, Q: RpcType, R: RpcType> Rpc<Name, Q, R> {
     }
 }
 
+type Implementation<State, Q, R> = Box<dyn Fn(&mut State, Q) -> RpcResult<R>>;
+
 pub struct RpcImpl<Name: RpcName, State, Q: RpcType, R: RpcType> {
     pub rpc: Rpc<Name, Q, R>,
-    call: Box<dyn Fn(&mut State, Q) -> RpcResult<R>>,
+    call: Implementation<State, Q, R>,
 }
 
 impl<Name: RpcName, State, Q: RpcType, R: RpcType> RpcImpl<Name, State, Q, R> {
-    pub fn new(name: Name, call: Box<dyn Fn(&mut State, Q) -> RpcResult<R>>) -> Self {
+    pub fn new(name: Name, call: Implementation<State, Q, R>) -> Self {
         Self {
             rpc: Rpc::new(name),
             call,
