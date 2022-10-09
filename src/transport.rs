@@ -3,15 +3,42 @@ use crate::error::{RpcError, RpcResult};
 
 use crate::{Bytes, OwnedBytes};
 use async_trait::async_trait;
-use log::{debug, error};
+use log::debug;
 use serde::{Deserialize, Serialize};
+use std::fmt::Formatter;
 use std::marker::PhantomData;
+
+#[derive(Debug)]
+pub enum TransportError {
+    SendError(String),
+    ReceiveError(String),
+}
+impl std::fmt::Display for TransportError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TransportError::SendError(s) => write!(f, "SendError({})", s),
+            TransportError::ReceiveError(s) => write!(f, "ReceiveError({})", s),
+        }
+    }
+}
+impl std::error::Error for TransportError {}
+impl TransportError {
+    fn io_send(e: std::io::Error) -> Self {
+        Self::SendError(format!("{:?}", e))
+    }
+    fn io_receive(e: std::io::Error) -> Self {
+        Self::ReceiveError(format!("{:?}", e))
+    }
+}
 
 #[async_trait]
 pub trait InternalTransport {
-    async fn send(&mut self, b: Bytes<'_>);
-    async fn send_and_wait_for_response(&mut self, b: Bytes<'_>) -> OwnedBytes;
-    async fn receive(&mut self) -> Option<OwnedBytes>;
+    async fn send(&mut self, b: Bytes<'_>) -> Result<(), TransportError>;
+    async fn send_and_wait_for_response(
+        &mut self,
+        b: Bytes<'_>,
+    ) -> Result<OwnedBytes, TransportError>;
+    async fn receive(&mut self) -> Result<OwnedBytes, TransportError>;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -96,34 +123,37 @@ impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
             package_bytes.len(),
             package_bytes
         );
-        let response_bytes = self
-            .internal_transport
+        self.internal_transport
             .send_and_wait_for_response(&package_bytes)
-            .await;
-        Ok(response_bytes)
+            .await
+            .map_err(Into::into)
     }
 
     pub async fn receive_query(&mut self) -> RpcResult<ReceivedQuery<Name>> {
-        if let Some(bytes) = self.internal_transport.receive().await {
-            debug!("Transport {} Bytes:  {:?}", bytes.len(), bytes);
-            let package: TransportPackageOwned =
-                serde_pickle::de::from_slice(&bytes, serde_pickle::DeOptions::new()).unwrap();
-            let name =
-                serde_pickle::de::from_slice(&package.name_bytes, serde_pickle::DeOptions::new())
-                    .unwrap();
-            Ok(ReceivedQuery {
-                name,
-                query_bytes: package.query_bytes,
-            })
-        } else {
-            //TODO Rework Custom Error
-            Err(RpcError::Custom("Got no bytes".into()))
+        match self.internal_transport.receive().await {
+            Ok(bytes) => {
+                debug!("Transport {} Bytes:  {:?}", bytes.len(), bytes);
+                let package: TransportPackageOwned =
+                    serde_pickle::de::from_slice(&bytes, serde_pickle::DeOptions::new()).unwrap();
+                let name = serde_pickle::de::from_slice(
+                    &package.name_bytes,
+                    serde_pickle::DeOptions::new(),
+                )
+                .unwrap();
+                Ok(ReceivedQuery {
+                    name,
+                    query_bytes: package.query_bytes,
+                })
+            }
+            Err(rpc_error) => Err(RpcError::TransportError(rpc_error)),
         }
     }
 
     pub async fn respond(&mut self, bytes: Bytes<'_>) -> RpcResult<()> {
-        self.internal_transport.send(bytes).await;
-        Ok(())
+        self.internal_transport
+            .send(bytes)
+            .await
+            .map_err(|e| RpcError::TransportError(e))
     }
 }
 
@@ -134,21 +164,31 @@ pub struct CannedTestingTransport {
 
 #[async_trait]
 impl InternalTransport for CannedTestingTransport {
-    async fn send(&mut self, _b: Bytes<'_>) {}
-
-    async fn send_and_wait_for_response(&mut self, _b: Bytes<'_>) -> OwnedBytes {
-        serde_pickle::to_vec(&self.always_respond_with, serde_pickle::SerOptions::new()).unwrap()
+    async fn send(&mut self, _b: Bytes<'_>) -> Result<(), TransportError> {
+        Ok(())
     }
 
-    async fn receive(&mut self) -> Option<OwnedBytes> {
+    async fn send_and_wait_for_response(
+        &mut self,
+        _b: Bytes<'_>,
+    ) -> Result<OwnedBytes, TransportError> {
+        Ok(
+            serde_pickle::to_vec(&self.always_respond_with, serde_pickle::SerOptions::new())
+                .unwrap(),
+        )
+    }
+
+    async fn receive(&mut self) -> Result<OwnedBytes, TransportError> {
         if self.receive_times > 0 {
             self.receive_times -= 1;
-            Some(
+            Ok(
                 serde_pickle::to_vec(&self.always_respond_with, serde_pickle::SerOptions::new())
                     .unwrap(),
             )
         } else {
-            None
+            Err(TransportError::ReceiveError(String::from(
+                "Run out of receive count",
+            )))
         }
     }
 }
@@ -165,28 +205,32 @@ impl TcpTransport {
 
 #[async_trait]
 impl InternalTransport for TcpTransport {
-    async fn send(&mut self, b: Bytes<'_>) {
+    async fn send(&mut self, b: Bytes<'_>) -> Result<(), TransportError> {
         use tokio::io::AsyncWriteExt;
         // TODO, handle error case in writing
-        self.stream.write_all(b).await.unwrap();
+        self.stream
+            .write_all(b)
+            .await
+            .map_err(TransportError::io_send)
     }
 
-    async fn send_and_wait_for_response(&mut self, b: Bytes<'_>) -> OwnedBytes {
-        self.send(b).await;
-        let r = self.receive().await;
-        r.unwrap()
+    async fn send_and_wait_for_response(
+        &mut self,
+        b: Bytes<'_>,
+    ) -> Result<OwnedBytes, TransportError> {
+        self.send(b).await?;
+        self.receive().await
     }
 
-    async fn receive(&mut self) -> Option<OwnedBytes> {
+    async fn receive(&mut self) -> Result<OwnedBytes, TransportError> {
         use tokio::io::AsyncReadExt;
         let mut buf = [0u8; 1024];
         let len = match self.stream.read(&mut buf).await {
             Ok(bytes_received) => bytes_received,
             Err(e) => {
-                error!(">> Error reading: {:?}", e);
-                0
+                return Err(TransportError::io_receive(e));
             }
         };
-        Some(buf[0..len].to_vec())
+        Ok(buf[0..len].to_vec())
     }
 }
