@@ -194,12 +194,16 @@ mod tests {
 
         let mut rpc_results = None;
         let mut client_call_task = tokio::spawn(async move {
-            let r1 = call_client(addr, "foo".into(), hello_world_rpc.clone()).await;
-            let r2 = call_client(addr, (), get_i_rpc.clone()).await;
-            call_client(addr, (), incr_i_rpc.clone()).await;
-            let r3 = call_client(addr, (), get_i_rpc).await;
-            call_client(addr, (), incr_i_rpc).await;
-            let r4 = call_client(addr, "bar".into(), hello_world_rpc).await;
+            let r1 = call_client(addr, "foo".into(), hello_world_rpc.clone())
+                .await
+                .unwrap();
+            let r2 = call_client(addr, (), get_i_rpc.clone()).await.unwrap();
+            call_client(addr, (), incr_i_rpc.clone()).await.unwrap();
+            let r3 = call_client(addr, (), get_i_rpc).await.unwrap();
+            call_client(addr, (), incr_i_rpc).await.unwrap();
+            let r4 = call_client(addr, "bar".into(), hello_world_rpc)
+                .await
+                .unwrap();
             (r1, r2, r3, r4)
         });
 

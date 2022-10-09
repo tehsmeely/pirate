@@ -12,12 +12,14 @@ use std::marker::PhantomData;
 pub enum TransportError {
     SendError(String),
     ReceiveError(String),
+    ConnectError(String),
 }
 impl std::fmt::Display for TransportError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             TransportError::SendError(s) => write!(f, "SendError({})", s),
             TransportError::ReceiveError(s) => write!(f, "ReceiveError({})", s),
+            TransportError::ConnectError(s) => write!(f, "ConnectError({})", s),
         }
     }
 }
