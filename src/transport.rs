@@ -209,7 +209,6 @@ impl TcpTransport {
 impl InternalTransport for TcpTransport {
     async fn send(&mut self, b: Bytes<'_>) -> Result<(), TransportError> {
         use tokio::io::AsyncWriteExt;
-        // TODO, handle error case in writing
         self.stream
             .write_all(b)
             .await
