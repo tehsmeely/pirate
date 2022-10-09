@@ -42,7 +42,7 @@ Call it
 
 ## Documentation
 
-TBC
+Documentation available on [docs.rs](https://docs.rs/pirates/)
 
 ## Examples
 
