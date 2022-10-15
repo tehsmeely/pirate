@@ -8,10 +8,14 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
 use std::marker::PhantomData;
 
+/// Errors specific to transport
 #[derive(Debug)]
 pub enum TransportError {
+    /// Error when sending (from the perspective of the the local program)
     SendError(String),
+    /// Error when receiving (from the perspective of the the local program)
     ReceiveError(String),
+    /// Error when establishing connection
     ConnectError(String),
 }
 impl std::fmt::Display for TransportError {
@@ -33,13 +37,22 @@ impl TransportError {
     }
 }
 
+/// The [InternalTransport] trait defines the transport layer for RPCs between client and server
 #[async_trait]
 pub trait InternalTransport {
+    /// async fn send(&mut self, b: Bytes<'_>) -> Result<(), TransportError>;
     async fn send(&mut self, b: Bytes<'_>) -> Result<(), TransportError>;
+
+    /// async fn send_and_wait_for_response(
+    ///     &mut self,
+    ///     b: Bytes<'_>,
+    /// ) -> Result<OwnedBytes, TransportError>;
     async fn send_and_wait_for_response(
         &mut self,
         b: Bytes<'_>,
     ) -> Result<OwnedBytes, TransportError>;
+
+    /// async fn receive(&mut self) -> Result<OwnedBytes, TransportError>;
     async fn receive(&mut self) -> Result<OwnedBytes, TransportError>;
 }
 
@@ -90,11 +103,15 @@ mod tests {
     }
 }
 
+/// The initial structure handed to the RpcServer, which includes
 pub struct ReceivedQuery<Name: RpcName> {
     pub name: Name,
     pub query_bytes: OwnedBytes,
 }
 
+/// Transport for data betweeen client and server, generic over the rpc names and internal transport
+/// The majority of the heavy lifting is done by the [internal_transport], see the definition of
+/// the [InternalTransport] trait for more information
 pub struct Transport<I, Name> {
     internal_transport: I,
     name: PhantomData<Name>,
@@ -159,11 +176,13 @@ impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
     }
 }
 
-pub struct CannedTestingTransport {
+#[cfg(test)]
+pub(crate) struct CannedTestingTransport {
     pub always_respond_with: String,
     pub receive_times: usize,
 }
 
+#[cfg(test)]
 #[async_trait]
 impl InternalTransport for CannedTestingTransport {
     async fn send(&mut self, _b: Bytes<'_>) -> Result<(), TransportError> {
@@ -195,6 +214,7 @@ impl InternalTransport for CannedTestingTransport {
     }
 }
 
+/// Pre-packaged implementation of [InternalTransport] using [tokio::net::TcpStream]
 pub struct TcpTransport {
     stream: tokio::net::TcpStream,
 }

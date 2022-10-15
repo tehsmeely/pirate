@@ -2,6 +2,9 @@ use crate::core::{Rpc, RpcName, RpcType};
 use crate::error::{RpcError, RpcResult};
 use crate::transport::{InternalTransport, TcpTransport, Transport, TransportError};
 
+/// An [RpcClient] encapsulates an Rpc and allows it to be called, providing a [Transport]
+/// a convenience function, [call_client] is provided which wraps this type and uses the
+/// [TcpTransport] transport
 pub struct RpcClient<Name: RpcName, Q: RpcType, R: RpcType> {
     rpc: Rpc<Name, Q, R>,
 }
@@ -10,6 +13,8 @@ impl<'de, Name: RpcName, Q: RpcType, R: RpcType> RpcClient<Name, Q, R> {
     pub fn new(rpc: Rpc<Name, Q, R>) -> Self {
         Self { rpc }
     }
+
+    /// Call the rpc, using the specified [Transport] to connect to the server
     pub async fn call(
         &self,
         query: Q,
@@ -21,6 +26,7 @@ impl<'de, Name: RpcName, Q: RpcType, R: RpcType> RpcClient<Name, Q, R> {
     }
 }
 
+/// Basic client call function using the [TpcTransport] internal transport
 pub async fn call_client<Name: RpcName, Q: RpcType, R: RpcType>(
     addr: &str,
     q: Q,

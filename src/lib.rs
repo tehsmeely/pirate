@@ -79,6 +79,8 @@ pub use crate::core::RpcName;
 pub use crate::core::RpcType;
 pub use crate::core::StoredRpc;
 pub use crate::server::RpcServer;
+pub use crate::transport::InternalTransport;
+pub use crate::transport::Transport;
 
 #[cfg(feature = "macros")]
 pub use pirates_macro_lib::rpc_definition;
