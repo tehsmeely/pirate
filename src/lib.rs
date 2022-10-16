@@ -96,6 +96,7 @@ mod tests {
     use crate::core::{Rpc, RpcImpl, RpcName};
     use crate::error::RpcResult;
     use crate::server::RpcServer;
+    use crate::transport::{TcpTransport, TransportConfig};
     use crate::RpcDefinition;
     use serde::{Deserialize, Serialize};
     use std::fmt::{Display, Formatter};
@@ -165,7 +166,13 @@ mod tests {
     #[test]
     fn just_server_test() {
         let state = HelloWorldState { i: 3 };
-        let mut server = RpcServer::new(Arc::new(Mutex::new(state)));
+        let mut server = RpcServer::new(
+            Arc::new(Mutex::new(state)),
+            TransportConfig::Pickle(
+                serde_pickle::DeOptions::new(),
+                serde_pickle::SerOptions::new(),
+            ),
+        );
         server.add_rpc(Box::new(make_hello_world_rpc_impl()));
         println!("Full Test");
         let incoming_bytes =
@@ -184,7 +191,13 @@ mod tests {
         println!("Server Setup");
         let state = HelloWorldState { i: 3 };
         let state_ref = Arc::new(Mutex::new(state));
-        let mut server = RpcServer::new(state_ref);
+        let mut server = RpcServer::new(
+            state_ref,
+            TransportConfig::Pickle(
+                serde_pickle::DeOptions::new(),
+                serde_pickle::SerOptions::new(),
+            ),
+        );
         server.add_rpc(Box::new(make_hello_world_rpc_impl()));
         server.add_rpc(Box::new(make_get_i_rpc_impl()));
         server.add_rpc(Box::new(IncrIRpc::server()));

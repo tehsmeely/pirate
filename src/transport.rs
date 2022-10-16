@@ -80,23 +80,22 @@ mod tests {
 
         let deo = serde_pickle::DeOptions::new();
         let sero = serde_pickle::SerOptions::new();
+        let transport_config = TransportConfig::Pickle(deo, sero);
 
-        let name_bytes = serde_pickle::to_vec(&name, sero.clone()).unwrap();
-        let query_bytes = serde_pickle::to_vec(&query, sero.clone()).unwrap();
+        let name_bytes = transport_config.serialize(&name);
+        let query_bytes = transport_config.serialize(&query);
 
         let package = TransportPackage {
             name_bytes: &name_bytes,
             query_bytes: &query_bytes,
         };
 
-        let package_bytes = serde_pickle::to_vec(&package, sero).unwrap();
+        let package_bytes = transport_config.serialize(&package);
 
-        let package2: TransportPackageOwned =
-            serde_pickle::from_slice(&package_bytes, deo.clone()).unwrap();
+        let package2: TransportPackageOwned = transport_config.deserialize(&package_bytes);
 
-        let name2: HelloWorldRpcName =
-            serde_pickle::from_slice(&package2.name_bytes, deo.clone()).unwrap();
-        let query2: String = serde_pickle::from_slice(&package2.query_bytes, deo).unwrap();
+        let name2: HelloWorldRpcName = transport_config.deserialize(&package2.name_bytes);
+        let query2: String = transport_config.deserialize(&package2.query_bytes);
 
         assert_eq!(name, name2);
         assert_eq!(query, query2);
@@ -115,6 +114,37 @@ pub struct ReceivedQuery<Name: RpcName> {
 pub struct Transport<I, Name> {
     internal_transport: I,
     name: PhantomData<Name>,
+    pub config: TransportConfig,
+}
+
+// TODO: Consider making transport Connected/Disconnected
+/*
+pub struct ConnectedTransport<I, Name> {
+    transport: Transport<I, Name>
+}
+ */
+
+/// TransportConfig defines how to (de)serialise query/response. Extra methods are available by enabling their feature
+pub enum TransportConfig {
+    Pickle(serde_pickle::DeOptions, serde_pickle::SerOptions),
+}
+
+// TODO: Handle unwraps here with some sort of [Serialise/DeserialiseError]
+impl TransportConfig {
+    pub(crate) fn serialize(&self, val: &impl Serialize) -> OwnedBytes {
+        match self {
+            Self::Pickle(_de_opts, ser_opts) => {
+                serde_pickle::ser::to_vec(val, ser_opts.clone()).unwrap()
+            }
+        }
+    }
+    pub(crate) fn deserialize<T: for<'de> Deserialize<'de>>(&self, bytes: Bytes) -> T {
+        match self {
+            Self::Pickle(de_opts, _ser_opts) => {
+                serde_pickle::de::from_slice(bytes, de_opts.clone()).unwrap()
+            }
+        }
+    }
 }
 
 impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
@@ -122,6 +152,10 @@ impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
         Self {
             internal_transport,
             name: PhantomData::default(),
+            config: TransportConfig::Pickle(
+                serde_pickle::DeOptions::new(),
+                serde_pickle::SerOptions::new(),
+            ),
         }
     }
     pub async fn send_query(
@@ -129,14 +163,12 @@ impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
         query_bytes: Bytes<'_>,
         rpc_name: &Name,
     ) -> RpcResult<OwnedBytes> {
-        let name_bytes =
-            serde_pickle::ser::to_vec(&rpc_name, serde_pickle::SerOptions::new()).unwrap();
+        let name_bytes = self.config.serialize(&rpc_name);
         let package = TransportPackage {
             name_bytes: &name_bytes,
             query_bytes,
         };
-        let package_bytes =
-            serde_pickle::ser::to_vec(&package, serde_pickle::SerOptions::new()).unwrap();
+        let package_bytes = self.config.serialize(&package);
         debug!(
             "Transport sending {} Bytes:  {:?}",
             package_bytes.len(),
@@ -152,13 +184,8 @@ impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
         match self.internal_transport.receive().await {
             Ok(bytes) => {
                 debug!("Transport {} Bytes:  {:?}", bytes.len(), bytes);
-                let package: TransportPackageOwned =
-                    serde_pickle::de::from_slice(&bytes, serde_pickle::DeOptions::new()).unwrap();
-                let name = serde_pickle::de::from_slice(
-                    &package.name_bytes,
-                    serde_pickle::DeOptions::new(),
-                )
-                .unwrap();
+                let package: TransportPackageOwned = self.config.deserialize(&bytes);
+                let name = self.config.deserialize(&package.name_bytes);
                 Ok(ReceivedQuery {
                     name,
                     query_bytes: package.query_bytes,
@@ -198,7 +225,6 @@ impl InternalTransport for CannedTestingTransport {
                 .unwrap(),
         )
     }
-
     async fn receive(&mut self) -> Result<OwnedBytes, TransportError> {
         if self.receive_times > 0 {
             self.receive_times -= 1;

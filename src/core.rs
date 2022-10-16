@@ -1,9 +1,10 @@
 use std::any::Any;
 
 use crate::error::RpcResult;
+use crate::transport::TransportConfig;
 use crate::{Bytes, OwnedBytes};
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -15,7 +16,7 @@ pub trait ToFromBytes {
         Self: Sized;
 }
 
-pub trait RpcType: Any + ToFromBytes + Clone {}
+pub trait RpcType: Any + Serialize + for<'de> Deserialize<'de> + Clone {}
 
 pub trait RpcName: PartialEq + Eq + Hash + Serialize + DeserializeOwned + Display + Clone {}
 
@@ -51,29 +52,45 @@ impl<Name: RpcName, State, Q: RpcType, R: RpcType> RpcImpl<Name, State, Q, R> {
         }
     }
 
+    /*
     fn query_of_bytes(&self, b: Bytes) -> RpcResult<Q> {
         Q::of_bytes(b)
     }
+     */
     fn call(&self, state: &mut State, q: Q) -> RpcResult<R> {
         (self.call)(state, q)
     }
+    /*
     fn result_to_bytes(&self, r: R) -> RpcResult<OwnedBytes> {
         R::to_bytes(&r)
     }
+     */
 }
 
 pub trait StoredRpc<State, Name: RpcName> {
-    fn call_of_bytes(&self, bytes: Bytes, state: &mut State) -> RpcResult<OwnedBytes>;
+    fn call_of_bytes(
+        &self,
+        bytes: Bytes,
+        transport_config: &TransportConfig,
+        state: &mut State,
+    ) -> RpcResult<OwnedBytes>;
     fn rpc_name(&self) -> Name;
 }
 
 impl<Name: RpcName, State, Q: RpcType, R: RpcType> StoredRpc<State, Name>
     for RpcImpl<Name, State, Q, R>
 {
-    fn call_of_bytes(&self, input_bytes: Bytes, state: &mut State) -> RpcResult<OwnedBytes> {
-        let query = self.query_of_bytes(input_bytes)?;
+    fn call_of_bytes(
+        &self,
+        input_bytes: Bytes,
+        transport_config: &TransportConfig,
+        state: &mut State,
+    ) -> RpcResult<OwnedBytes> {
+        //let query = self.query_of_bytes(input_bytes)?;
+        let query = transport_config.deserialize(input_bytes);
         let result = self.call(state, query)?;
-        let result_bytes = self.result_to_bytes(result)?;
+        //let result_bytes = self.result_to_bytes(result)?;
+        let result_bytes = transport_config.serialize(&result);
         Ok(result_bytes)
     }
 

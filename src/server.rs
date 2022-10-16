@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::core::{RpcName, StoredRpc};
 use crate::error::{RpcError, RpcResult};
-use crate::transport::{TcpTransport, Transport};
+use crate::transport::{InternalTransport, TcpTransport, Transport, TransportConfig};
 use crate::OwnedBytes;
 use log::{debug, error, info, warn};
 
@@ -13,16 +13,18 @@ where
 {
     state: Arc<Mutex<S>>,
     rpcs: HashMap<Name, Box<dyn StoredRpc<S, Name>>>,
+    transport_config: TransportConfig,
 }
 
 impl<S, Name> RpcServer<S, Name>
 where
     Name: RpcName,
 {
-    pub fn new(state: Arc<Mutex<S>>) -> Self {
+    pub fn new(state: Arc<Mutex<S>>, transport_config: TransportConfig) -> Self {
         Self {
             state,
             rpcs: HashMap::new(),
+            transport_config,
         }
     }
 
@@ -41,7 +43,7 @@ where
             Some(rpc_impl) => {
                 let result_bytes = {
                     let mut state = self.state.lock().unwrap();
-                    rpc_impl.call_of_bytes(incoming_bytes, &mut state)?
+                    rpc_impl.call_of_bytes(incoming_bytes, &self.transport_config, &mut state)?
                 };
                 Ok(result_bytes)
             }
