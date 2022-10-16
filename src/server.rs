@@ -58,7 +58,7 @@ where
         debug!("Handling connection: {:?}", tcp_stream);
         let mut transport = {
             let async_trans = TcpTransport::new(tcp_stream);
-            Transport::new(async_trans)
+            Transport::new(async_trans, self.transport_config.clone())
         };
         let received_query = transport.receive_query().await?;
         let result_bytes = self

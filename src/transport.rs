@@ -126,6 +126,7 @@ pub struct ConnectedTransport<I, Name> {
 
 /// TransportConfig defines how to (de)serialise query/response. Extra methods are available by enabling their feature
 #[non_exhaustive]
+#[derive(Clone, Debug)]
 pub enum TransportConfig {
     Pickle(serde_pickle::DeOptions, serde_pickle::SerOptions),
     #[cfg(feature = "transport_postcard")]

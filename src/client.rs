@@ -65,7 +65,7 @@ mod tests {
             always_respond_with: "Foo-Bar".to_string(),
             receive_times: 0,
         };
-        let mut transport = Transport::new(internal_transport);
+        let mut transport = Transport::new(internal_transport, Default::default());
 
         let rpc_client = RpcClient {
             rpc: make_hello_world_rpc(),
