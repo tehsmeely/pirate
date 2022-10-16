@@ -125,8 +125,11 @@ pub struct ConnectedTransport<I, Name> {
  */
 
 /// TransportConfig defines how to (de)serialise query/response. Extra methods are available by enabling their feature
+#[non_exhaustive]
 pub enum TransportConfig {
     Pickle(serde_pickle::DeOptions, serde_pickle::SerOptions),
+    #[cfg(feature = "transport_postcard")]
+    Postcard,
 }
 
 // TODO: Handle unwraps here with some sort of [Serialise/DeserialiseError]
@@ -136,6 +139,8 @@ impl TransportConfig {
             Self::Pickle(_de_opts, ser_opts) => {
                 serde_pickle::ser::to_vec(val, ser_opts.clone()).unwrap()
             }
+            #[cfg(feature = "transport_postcard")]
+            Self::Postcard => postcard::to_vec(val).unwrap(),
         }
     }
     pub(crate) fn deserialize<T: for<'de> Deserialize<'de>>(&self, bytes: Bytes) -> T {
@@ -143,19 +148,27 @@ impl TransportConfig {
             Self::Pickle(de_opts, _ser_opts) => {
                 serde_pickle::de::from_slice(bytes, de_opts.clone()).unwrap()
             }
+            #[cfg(feature = "transport_postcard")]
+            Self::Postcard => postcard::from_bytes(bytes).unwrap(),
         }
     }
 }
 
+impl Default for TransportConfig {
+    fn default() -> Self {
+        Self::Pickle(
+            serde_pickle::DeOptions::new(),
+            serde_pickle::SerOptions::new(),
+        )
+    }
+}
+
 impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
-    pub fn new(internal_transport: I) -> Self {
+    pub fn new(internal_transport: I, transport_config: TransportConfig) -> Self {
         Self {
             internal_transport,
             name: PhantomData::default(),
-            config: TransportConfig::Pickle(
-                serde_pickle::DeOptions::new(),
-                serde_pickle::SerOptions::new(),
-            ),
+            config: transport_config,
         }
     }
     pub async fn send_query(

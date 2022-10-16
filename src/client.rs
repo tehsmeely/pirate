@@ -1,6 +1,8 @@
 use crate::core::{Rpc, RpcName, RpcType};
 use crate::error::{RpcError, RpcResult};
-use crate::transport::{InternalTransport, TcpTransport, Transport, TransportError};
+use crate::transport::{
+    InternalTransport, TcpTransport, Transport, TransportConfig, TransportError,
+};
 
 /// An [RpcClient] encapsulates an Rpc and allows it to be called, providing a [Transport]
 /// a convenience function, [call_client] is provided which wraps this type and uses the
@@ -28,7 +30,7 @@ impl<'de, Name: RpcName, Q: RpcType, R: RpcType> RpcClient<Name, Q, R> {
     }
 }
 
-/// Basic client call function using the [TpcTransport] internal transport
+/// Basic client call function using the [TpcTransport] internal transport with [TransportConfig::Pickle]
 pub async fn call_client<Name: RpcName, Q: RpcType, R: RpcType>(
     addr: &str,
     q: Q,
@@ -38,7 +40,7 @@ pub async fn call_client<Name: RpcName, Q: RpcType, R: RpcType>(
         let l = match tokio::net::TcpStream::connect(addr).await {
             Ok(client_stream) => {
                 let tcp_transport = TcpTransport::new(client_stream);
-                Ok(Transport::new(tcp_transport))
+                Ok(Transport::new(tcp_transport, TransportConfig::default()))
             }
             Err(e) => Err(e),
         };

@@ -14,6 +14,7 @@ categories = ["asynchronous", "network-programming"]
 
 macros = []
 
+transport_postcard = ["postcard"]
 
 [dependencies]
 log = "0.4.17"
@@ -22,3 +23,6 @@ serde-pickle = "1.1.1"
 tokio = {version = "1.21.1", features = ["net", "io-util", "rt", "macros"]}
 async-trait = "0.1.57"
 pirates_macro_lib = { version = "0.1.0", path = "pirates-macro-lib"}
+
+## Optional deps for transports:
+postcard = {version = "1.0.2", optional = true}
