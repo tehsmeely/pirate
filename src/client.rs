@@ -22,11 +22,9 @@ impl<'de, Name: RpcName, Q: RpcType, R: RpcType> RpcClient<Name, Q, R> {
         query: Q,
         transport: &mut Transport<impl InternalTransport, Name>,
     ) -> RpcResult<R> {
-        //let query_bytes = query.to_bytes()?;
         let query_bytes = transport.config.serialize(&query);
         let result_bytes = transport.send_query(&query_bytes, &self.rpc.name).await?;
         Ok(transport.config.deserialize(&result_bytes))
-        //R::of_bytes(&result_bytes)
     }
 }
 

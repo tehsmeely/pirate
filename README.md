@@ -46,10 +46,14 @@ Documentation available on [docs.rs](https://docs.rs/pirates/)
 
 ## Examples
 
-And example name server is available in `example/`.
+And example "name server" is available in `example/`.
 This produces a CLI binary from which you can host the server and then query it
 separately to add and print names. See the README in that directory for more info
 
+## TODO
+
+* More examples?
+*  
 
 ## License
 Apache-2.0 Or MIT 

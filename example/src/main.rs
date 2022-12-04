@@ -1,5 +1,5 @@
 use clap::{arg, value_parser};
-use pirates::{call_client, RpcDefinition, RpcName, RpcServer};
+use pirates::{call_client, RpcDefinition, RpcName, RpcServer, TransportConfig};
 use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
 use std::sync::{Arc, Mutex};
@@ -69,7 +69,8 @@ async fn server(addr: &str) {
         names: Vec::new(),
     };
     let state_ref = Arc::new(Mutex::new(state));
-    let mut server = RpcServer::new(state_ref);
+    let transport_config = TransportConfig::default();
+    let mut server = RpcServer::new(state_ref, transport_config);
     server.add_rpc(Box::new(rpcs::AddName::server()));
     server.add_rpc(Box::new(rpcs::GetNames::server()));
     println!("Serving on {}!", addr);
@@ -89,10 +90,14 @@ async fn client(addr: &str, selection: CliSelection) {
 }
 
 async fn add_name_cli(addr: &str, name: String) {
-    call_client(addr, name, rpcs::AddName::client()).await;
+    call_client(addr, name, rpcs::AddName::client())
+        .await
+        .unwrap();
 }
 async fn print_names_cli(addr: &str) {
-    let names = call_client(addr, (), rpcs::GetNames::client()).await;
+    let names = call_client(addr, (), rpcs::GetNames::client())
+        .await
+        .unwrap();
     for name in names {
         println!("{}", name);
     }
