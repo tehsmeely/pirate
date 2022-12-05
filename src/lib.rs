@@ -112,6 +112,8 @@ mod tests {
         HelloWorld,
         GetI,
         IncrI,
+        MassiveRpc,
+        PreciseRpc,
     }
     impl Display for HelloWorldRpcName {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -164,6 +166,64 @@ mod tests {
         }
     }
 
+    pub struct MassiveRpc {}
+    impl MassiveRpc {
+        fn implement(_state: &mut HelloWorldState, query: usize) -> RpcResult<Vec<u32>> {
+            let mut v = Vec::new();
+            let mut i = 0;
+            while i < query {
+                v.push(1u32);
+                i += 1;
+            }
+            Ok(v)
+        }
+    }
+    impl RpcDefinition<HelloWorldRpcName, HelloWorldState, usize, Vec<u32>> for MassiveRpc {
+        fn client() -> Rpc<HelloWorldRpcName, usize, Vec<u32>> {
+            Rpc::new(HelloWorldRpcName::MassiveRpc)
+        }
+
+        fn server() -> RpcImpl<HelloWorldRpcName, HelloWorldState, usize, Vec<u32>> {
+            RpcImpl::new(HelloWorldRpcName::MassiveRpc, Box::new(Self::implement))
+        }
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    pub struct PrecisePayload {
+        bulk_bytes: Vec<u32>,
+        padding: Vec<bool>,
+    }
+    pub struct PreciseRpc {}
+    impl PreciseRpc {
+        fn implement(_state: &mut HelloWorldState, query: usize) -> RpcResult<PrecisePayload> {
+            let mut v = Vec::new();
+            let mut i = 0;
+            while i < query {
+                v.push(1u32);
+                i += 1;
+            }
+            let mut padding = Vec::new();
+            let mut i = 0;
+            while i < 128 + 7 {
+                padding.push(true);
+                i += 1;
+            }
+            Ok(PrecisePayload {
+                bulk_bytes: v,
+                padding,
+            })
+        }
+    }
+    impl RpcDefinition<HelloWorldRpcName, HelloWorldState, usize, PrecisePayload> for PreciseRpc {
+        fn client() -> Rpc<HelloWorldRpcName, usize, PrecisePayload> {
+            Rpc::new(HelloWorldRpcName::PreciseRpc)
+        }
+
+        fn server() -> RpcImpl<HelloWorldRpcName, HelloWorldState, usize, PrecisePayload> {
+            RpcImpl::new(HelloWorldRpcName::PreciseRpc, Box::new(Self::implement))
+        }
+    }
+
     #[test]
     fn just_server_test() {
         let state = HelloWorldState { i: 3 };
@@ -187,7 +247,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn server_a() {
+    async fn regular_server() {
         // Server setup
         println!("Server Setup");
         let state = HelloWorldState { i: 3 };
@@ -238,5 +298,54 @@ mod tests {
         assert_eq!(4usize, get_i_2);
         let expecting2: String = "Hello world: 5:\"bar\"".into();
         assert_eq!(expecting2, hello_world_2);
+    }
+
+    #[tokio::test]
+    async fn big_rpc_server() {
+        // Server setup
+        println!("Server Setup");
+        let state = HelloWorldState { i: 3 };
+        let state_ref = Arc::new(Mutex::new(state));
+        let mut server = RpcServer::new(
+            state_ref,
+            TransportConfig::Pickle(
+                serde_pickle::DeOptions::new(),
+                serde_pickle::SerOptions::new(),
+            ),
+        );
+        server.add_rpc(Box::new(MassiveRpc::server()));
+        server.add_rpc(Box::new(PreciseRpc::server()));
+        let addr = "127.0.0.1:5556";
+
+        let massive_rpc_client = MassiveRpc::client();
+        let precise_rpc_client = PreciseRpc::client();
+
+        let num_bulk = 170;
+        let mut rpc_results = None;
+        let mut client_call_task = tokio::spawn(async move {
+            let result = call_client(addr, 2000, massive_rpc_client.clone())
+                .await
+                .unwrap();
+            //
+            let result2: PrecisePayload = call_client(addr, num_bulk, precise_rpc_client)
+                .await
+                .unwrap();
+            (result.len(), result2.bulk_bytes.len())
+        });
+
+        while rpc_results.is_none() {
+            println!(".");
+            tokio::select! {
+                _ = server.serve(addr) => {},
+                client_output = &mut client_call_task => {rpc_results = Some(client_output)},
+            }
+        }
+
+        let (massive_len, slightly_smaller_len) = rpc_results.unwrap().unwrap();
+        assert_eq!(massive_len, 2000);
+        // which returns 10010 bytes = 8000 bytes + 2010 overhead?
+
+        assert_eq!(slightly_smaller_len, num_bulk);
+        // which returns 1286 bytes = 1024 + 262 overhead
     }
 }

@@ -285,13 +285,28 @@ impl InternalTransport for TcpTransport {
 
     async fn receive(&mut self) -> Result<OwnedBytes, TransportError> {
         use tokio::io::AsyncReadExt;
+        // 1024 * 8 = 8192 bits = 256 * u32s
         let mut buf = [0u8; 1024];
-        let len = match self.stream.read(&mut buf).await {
-            Ok(bytes_received) => bytes_received,
-            Err(e) => {
-                return Err(TransportError::io_receive(e));
-            }
-        };
-        Ok(buf[0..len].to_vec())
+        let mut return_bytes = Vec::new();
+        loop {
+            // TODO: Add rcv timeout
+            match self.stream.read(&mut buf).await {
+                Ok(0) => {
+                    println!("Received 0 bytes, returning");
+                    return Ok(return_bytes);
+                }
+                Ok(bytes_received) => {
+                    println!("Received {} bytes", bytes_received);
+                    return_bytes.extend_from_slice(&buf[0..bytes_received]);
+                    if bytes_received < buf.len() {
+                        println!("Returning because < 1024");
+                        return Ok(return_bytes);
+                    }
+                }
+                Err(e) => {
+                    return Err(TransportError::io_receive(e));
+                }
+            };
+        }
     }
 }
