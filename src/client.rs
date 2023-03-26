@@ -2,6 +2,7 @@ use crate::core::{Rpc, RpcName, RpcType};
 use crate::error::{RpcError, RpcResult};
 use crate::transport::{
     InternalTransport, TcpTransport, Transport, TransportConfig, TransportError,
+    TransportWireConfig,
 };
 
 /// An [RpcClient] encapsulates an Rpc and allows it to be called, providing a [Transport]
@@ -22,9 +23,9 @@ impl<'de, Name: RpcName, Q: RpcType, R: RpcType> RpcClient<Name, Q, R> {
         query: Q,
         transport: &mut Transport<impl InternalTransport, Name>,
     ) -> RpcResult<R> {
-        let query_bytes = transport.config.serialize(&query);
+        let query_bytes = transport.config.wire_config.serialize(&query);
         let result_bytes = transport.send_query(&query_bytes, &self.rpc.name).await?;
-        Ok(transport.config.deserialize(&result_bytes))
+        Ok(transport.config.wire_config.deserialize(&result_bytes))
     }
 }
 

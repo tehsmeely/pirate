@@ -43,7 +43,11 @@ where
             Some(rpc_impl) => {
                 let result_bytes = {
                     let mut state = self.state.lock().unwrap();
-                    rpc_impl.call_of_bytes(incoming_bytes, &self.transport_config, &mut state)?
+                    rpc_impl.call_of_bytes(
+                        incoming_bytes,
+                        &self.transport_config.wire_config,
+                        &mut state,
+                    )?
                 };
                 Ok(result_bytes)
             }

@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use crate::error::RpcResult;
-use crate::transport::TransportConfig;
+use crate::transport::TransportWireConfig;
 use crate::{Bytes, OwnedBytes};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -71,7 +71,7 @@ pub trait StoredRpc<State, Name: RpcName> {
     fn call_of_bytes(
         &self,
         bytes: Bytes,
-        transport_config: &TransportConfig,
+        transport_config: &TransportWireConfig,
         state: &mut State,
     ) -> RpcResult<OwnedBytes>;
     fn rpc_name(&self) -> Name;
@@ -83,7 +83,7 @@ impl<Name: RpcName, State, Q: RpcType, R: RpcType> StoredRpc<State, Name>
     fn call_of_bytes(
         &self,
         input_bytes: Bytes,
-        transport_config: &TransportConfig,
+        transport_config: &TransportWireConfig,
         state: &mut State,
     ) -> RpcResult<OwnedBytes> {
         //let query = self.query_of_bytes(input_bytes)?;

@@ -81,7 +81,7 @@ pub use crate::core::StoredRpc;
 pub use crate::server::RpcServer;
 pub use crate::transport::InternalTransport;
 pub use crate::transport::Transport;
-pub use crate::transport::TransportConfig;
+pub use crate::transport::TransportWireConfig;
 
 #[cfg(feature = "macros")]
 pub use pirates_macro_lib::rpc_definition;
@@ -97,11 +97,12 @@ mod tests {
     use crate::core::{Rpc, RpcImpl, RpcName};
     use crate::error::RpcResult;
     use crate::server::RpcServer;
-    use crate::transport::{TcpTransport, TransportConfig};
+    use crate::transport::{TcpTransport, TransportConfig, TransportWireConfig};
     use crate::RpcDefinition;
     use serde::{Deserialize, Serialize};
     use std::fmt::{Display, Formatter};
     use std::sync::{Arc, Mutex};
+    use std::time::Duration;
 
     pub struct HelloWorldState {
         pub i: usize,
@@ -227,13 +228,14 @@ mod tests {
     #[test]
     fn just_server_test() {
         let state = HelloWorldState { i: 3 };
-        let mut server = RpcServer::new(
-            Arc::new(Mutex::new(state)),
-            TransportConfig::Pickle(
+        let transport_config = TransportConfig {
+            rcv_timeout: Duration::from_secs(3),
+            wire_config: TransportWireConfig::Pickle(
                 serde_pickle::DeOptions::new(),
                 serde_pickle::SerOptions::new(),
             ),
-        );
+        };
+        let mut server = RpcServer::new(Arc::new(Mutex::new(state)), transport_config);
         server.add_rpc(Box::new(make_hello_world_rpc_impl()));
         println!("Full Test");
         let incoming_bytes =
@@ -252,13 +254,8 @@ mod tests {
         println!("Server Setup");
         let state = HelloWorldState { i: 3 };
         let state_ref = Arc::new(Mutex::new(state));
-        let mut server = RpcServer::new(
-            state_ref,
-            TransportConfig::Pickle(
-                serde_pickle::DeOptions::new(),
-                serde_pickle::SerOptions::new(),
-            ),
-        );
+        let transport_config = TransportConfig::default();
+        let mut server = RpcServer::new(state_ref, transport_config);
         server.add_rpc(Box::new(make_hello_world_rpc_impl()));
         server.add_rpc(Box::new(make_get_i_rpc_impl()));
         server.add_rpc(Box::new(IncrIRpc::server()));
@@ -306,13 +303,7 @@ mod tests {
         println!("Server Setup");
         let state = HelloWorldState { i: 3 };
         let state_ref = Arc::new(Mutex::new(state));
-        let mut server = RpcServer::new(
-            state_ref,
-            TransportConfig::Pickle(
-                serde_pickle::DeOptions::new(),
-                serde_pickle::SerOptions::new(),
-            ),
-        );
+        let mut server = RpcServer::new(state_ref, TransportConfig::default());
         server.add_rpc(Box::new(MassiveRpc::server()));
         server.add_rpc(Box::new(PreciseRpc::server()));
         let addr = "127.0.0.1:5556";

@@ -7,6 +7,8 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
 use std::marker::PhantomData;
+use std::thread::park_timeout_ms;
+use std::time::Duration;
 
 /// Errors specific to transport
 #[derive(Debug)]
@@ -17,6 +19,8 @@ pub enum TransportError {
     ReceiveError(String),
     /// Error when establishing connection
     ConnectError(String),
+    /// Error from timeout after waiting some [Duration].
+    ReceiveTimeout(Duration),
 }
 impl std::fmt::Display for TransportError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -24,6 +28,7 @@ impl std::fmt::Display for TransportError {
             TransportError::SendError(s) => write!(f, "SendError({})", s),
             TransportError::ReceiveError(s) => write!(f, "ReceiveError({})", s),
             TransportError::ConnectError(s) => write!(f, "ConnectError({})", s),
+            TransportError::ReceiveTimeout(dur) => write!(f, "ReceiveTimeout({:?})", dur),
         }
     }
 }
@@ -46,14 +51,16 @@ pub trait InternalTransport {
     /// async fn send_and_wait_for_response(
     ///     &mut self,
     ///     b: Bytes<'_>,
+    ///     timeout: Duration,
     /// ) -> Result<OwnedBytes, TransportError>;
     async fn send_and_wait_for_response(
         &mut self,
         b: Bytes<'_>,
+        timeout: Duration,
     ) -> Result<OwnedBytes, TransportError>;
 
-    /// async fn receive(&mut self) -> Result<OwnedBytes, TransportError>;
-    async fn receive(&mut self) -> Result<OwnedBytes, TransportError>;
+    /// async fn receive(&mut self, timeout: Option<Duration>) -> Result<OwnedBytes, TransportError>;
+    async fn receive(&mut self, timeout: Option<Duration>) -> Result<OwnedBytes, TransportError>;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -80,7 +87,7 @@ mod tests {
 
         let deo = serde_pickle::DeOptions::new();
         let sero = serde_pickle::SerOptions::new();
-        let transport_config = TransportConfig::Pickle(deo, sero);
+        let transport_config = TransportWireConfig::Pickle(deo, sero);
 
         let name_bytes = transport_config.serialize(&name);
         let query_bytes = transport_config.serialize(&query);
@@ -124,17 +131,35 @@ pub struct ConnectedTransport<I, Name> {
 }
  */
 
-/// TransportConfig defines how to (de)serialise query/response. Extra methods are available by enabling their feature
+/// TransportConfig defines various config options for transport handling
+/// [rcv_timeout] is used to protect receiving with a timeout
+/// [wire_config] is for serialising sent data, see the type def for more
+#[derive(Clone, Debug)]
+pub struct TransportConfig {
+    pub rcv_timeout: Duration,
+    pub wire_config: TransportWireConfig,
+}
+
+impl Default for TransportConfig {
+    fn default() -> Self {
+        Self {
+            rcv_timeout: Duration::from_secs(3),
+            wire_config: TransportWireConfig::default(),
+        }
+    }
+}
+
+/// TransportWireConfig defines how to (de)serialise query/response. Extra methods are available by enabling their feature
 #[non_exhaustive]
 #[derive(Clone, Debug)]
-pub enum TransportConfig {
+pub enum TransportWireConfig {
     Pickle(serde_pickle::DeOptions, serde_pickle::SerOptions),
     #[cfg(feature = "transport_postcard")]
     Postcard,
 }
 
 // TODO: Handle unwraps here with some sort of [Serialise/DeserialiseError]
-impl TransportConfig {
+impl TransportWireConfig {
     pub(crate) fn serialize(&self, val: &impl Serialize) -> OwnedBytes {
         match self {
             Self::Pickle(_de_opts, ser_opts) => {
@@ -155,7 +180,7 @@ impl TransportConfig {
     }
 }
 
-impl Default for TransportConfig {
+impl Default for TransportWireConfig {
     fn default() -> Self {
         Self::Pickle(
             serde_pickle::DeOptions::new(),
@@ -177,29 +202,30 @@ impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
         query_bytes: Bytes<'_>,
         rpc_name: &Name,
     ) -> RpcResult<OwnedBytes> {
-        let name_bytes = self.config.serialize(&rpc_name);
+        let name_bytes = self.config.wire_config.serialize(&rpc_name);
         let package = TransportPackage {
             name_bytes: &name_bytes,
             query_bytes,
         };
-        let package_bytes = self.config.serialize(&package);
+        let package_bytes = self.config.wire_config.serialize(&package);
         debug!(
             "Transport sending {} Bytes:  {:?}",
             package_bytes.len(),
             package_bytes
         );
         self.internal_transport
-            .send_and_wait_for_response(&package_bytes)
+            .send_and_wait_for_response(&package_bytes, self.config.rcv_timeout)
             .await
             .map_err(Into::into)
     }
 
     pub async fn receive_query(&mut self) -> RpcResult<ReceivedQuery<Name>> {
-        match self.internal_transport.receive().await {
+        // We receive with no timeout as we want to sit and wait on [internal_transport]
+        match self.internal_transport.receive(None).await {
             Ok(bytes) => {
                 debug!("Transport {} Bytes:  {:?}", bytes.len(), bytes);
-                let package: TransportPackageOwned = self.config.deserialize(&bytes);
-                let name = self.config.deserialize(&package.name_bytes);
+                let package: TransportPackageOwned = self.config.wire_config.deserialize(&bytes);
+                let name = self.config.wire_config.deserialize(&package.name_bytes);
                 Ok(ReceivedQuery {
                     name,
                     query_bytes: package.query_bytes,
@@ -233,13 +259,14 @@ impl InternalTransport for CannedTestingTransport {
     async fn send_and_wait_for_response(
         &mut self,
         _b: Bytes<'_>,
+        _timeout: Duration,
     ) -> Result<OwnedBytes, TransportError> {
         Ok(
             serde_pickle::to_vec(&self.always_respond_with, serde_pickle::SerOptions::new())
                 .unwrap(),
         )
     }
-    async fn receive(&mut self) -> Result<OwnedBytes, TransportError> {
+    async fn receive(&mut self, _timeout: Option<Duration>) -> Result<OwnedBytes, TransportError> {
         if self.receive_times > 0 {
             self.receive_times -= 1;
             Ok(
@@ -278,19 +305,27 @@ impl InternalTransport for TcpTransport {
     async fn send_and_wait_for_response(
         &mut self,
         b: Bytes<'_>,
+        timeout: Duration,
     ) -> Result<OwnedBytes, TransportError> {
         self.send(b).await?;
-        self.receive().await
+        self.receive(Some(timeout)).await
     }
 
-    async fn receive(&mut self) -> Result<OwnedBytes, TransportError> {
+    async fn receive(&mut self, timeout: Option<Duration>) -> Result<OwnedBytes, TransportError> {
         use tokio::io::AsyncReadExt;
         // 1024 * 8 = 8192 bits = 256 * u32s
         let mut buf = [0u8; 1024];
         let mut return_bytes = Vec::new();
         loop {
-            // TODO: Add rcv timeout
-            match self.stream.read(&mut buf).await {
+            let read_fut = self.stream.read(&mut buf);
+            let result = match timeout {
+                Some(timeout_) => match tokio::time::timeout(timeout_, read_fut).await {
+                    Ok(r) => r,
+                    Err(_) => return Err(TransportError::ReceiveTimeout(timeout_)),
+                },
+                None => read_fut.await,
+            };
+            match result {
                 Ok(0) => {
                     println!("Received 0 bytes, returning");
                     return Ok(return_bytes);
