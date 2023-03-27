@@ -7,7 +7,6 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
 use std::marker::PhantomData;
-use std::thread::park_timeout_ms;
 use std::time::Duration;
 
 /// Errors specific to transport

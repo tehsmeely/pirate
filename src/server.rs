@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::core::{RpcName, StoredRpc};
 use crate::error::{RpcError, RpcResult};
-use crate::transport::{InternalTransport, TcpTransport, Transport, TransportConfig};
+use crate::transport::{TcpTransport, Transport, TransportConfig};
 use crate::OwnedBytes;
 use log::{debug, error, info, warn};
 

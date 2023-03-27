@@ -97,7 +97,7 @@ mod tests {
     use crate::core::{Rpc, RpcImpl, RpcName};
     use crate::error::RpcResult;
     use crate::server::RpcServer;
-    use crate::transport::{TcpTransport, TransportConfig, TransportWireConfig};
+    use crate::transport::{TransportConfig, TransportWireConfig};
     use crate::RpcDefinition;
     use serde::{Deserialize, Serialize};
     use std::fmt::{Display, Formatter};

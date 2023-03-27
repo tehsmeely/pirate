@@ -1,6 +1,4 @@
-use crate::core::{RpcType, ToFromBytes};
-use crate::error::RpcResult;
-use crate::{Bytes, OwnedBytes};
+use crate::core::RpcType;
 
 use serde::{Deserialize, Serialize};
 

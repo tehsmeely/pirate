@@ -2,7 +2,6 @@ use crate::core::{Rpc, RpcName, RpcType};
 use crate::error::{RpcError, RpcResult};
 use crate::transport::{
     InternalTransport, TcpTransport, Transport, TransportConfig, TransportError,
-    TransportWireConfig,
 };
 
 /// An [RpcClient] encapsulates an Rpc and allows it to be called, providing a [Transport]
