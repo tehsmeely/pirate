@@ -238,7 +238,7 @@ impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
         self.internal_transport
             .send(bytes)
             .await
-            .map_err(|e| RpcError::TransportError(e))
+            .map_err(RpcError::TransportError)
     }
 }
 

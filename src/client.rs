@@ -35,14 +35,13 @@ pub async fn call_client<Name: RpcName, Q: RpcType, R: RpcType>(
     rpc: Rpc<Name, Q, R>,
 ) -> RpcResult<R> {
     let mut transport = {
-        let l = match tokio::net::TcpStream::connect(addr).await {
+        match tokio::net::TcpStream::connect(addr).await {
             Ok(client_stream) => {
                 let tcp_transport = TcpTransport::new(client_stream);
                 Ok(Transport::new(tcp_transport, TransportConfig::default()))
             }
             Err(e) => Err(e),
-        };
-        l
+        }
     }
     .map_err(|e| RpcError::TransportError(TransportError::ConnectError(format!("{}", e))))?;
 
