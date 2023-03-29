@@ -6,7 +6,8 @@
 //! contains a run and implement function (Enable the "macros" feature)
 //!
 //! ```rust,no_run
-//! pub struct AddName {}
+//! # pub struct AddName {}
+//! # pub use pirates_macro_lib::rpc_definition;
 //! #[pirates::rpc_definition]
 //! impl AddName {
 //!     fn name() -> RpcId {
@@ -22,6 +23,8 @@
 //! There are two core types these are generic over which you need to define:
 //! 1) Rpc Identifier. Create a type which implements RpcName
 //! ```rust,no_run
+//! # use serde::{Serialize,Deserialize};
+//! # use std::fmt::Formatter;
 //! #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone)]
 //! enum RpcId {
 //!     AddName,
@@ -47,7 +50,7 @@
 //! When you have an rpc definition, you can now serve it.
 //! Serving is done by creating an `RpcServer` and awaiting its `serve` method
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! let mut server = RpcServer::new(state.clone());
 //! server.add_rpc(Box::new(rpcs::AddName::server()));
 //! server.serve("127.0.0.1:5959").await;
@@ -55,7 +58,7 @@
 //!
 //!
 //! Elsewhere, to call it, use the `call_client` function with access to the RPC
-//! ```rust,no_run
+//! ```rust,ignore
 //! let addr = "127.0.0.1:5959";
 //! let name = String::from("Gaspode the wonder dog");
 //! pirates::call_client(addr, name, rpcs::AddName::client()).await;
@@ -81,6 +84,7 @@ pub use crate::core::StoredRpc;
 pub use crate::server::RpcServer;
 pub use crate::transport::InternalTransport;
 pub use crate::transport::Transport;
+pub use crate::transport::TransportConfig;
 pub use crate::transport::TransportWireConfig;
 
 #[cfg(feature = "macros")]

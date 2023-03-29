@@ -86,11 +86,9 @@ impl<Name: RpcName, State, Q: RpcType, R: RpcType> StoredRpc<State, Name>
         transport_config: &TransportWireConfig,
         state: &mut State,
     ) -> RpcResult<OwnedBytes> {
-        //let query = self.query_of_bytes(input_bytes)?;
-        let query = transport_config.deserialize(input_bytes);
+        let query = transport_config.deserialize(input_bytes)?;
         let result = self.call(state, query)?;
-        //let result_bytes = self.result_to_bytes(result)?;
-        let result_bytes = transport_config.serialize(&result);
+        let result_bytes = transport_config.serialize(&result)?;
         Ok(result_bytes)
     }
 

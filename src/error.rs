@@ -1,4 +1,5 @@
 use crate::transport::TransportError;
+use crate::OwnedBytes;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
@@ -32,4 +33,12 @@ impl From<TransportError> for RpcError {
     }
 }
 
+// TODO: Make this an actual struct and not just a type alias
 pub type RpcResult<A> = Result<A, RpcError>;
+
+pub fn into_rpc_result_transport<T>(result: Result<T, TransportError>) -> RpcResult<T> {
+    match result {
+        Ok(bytes) => Ok(bytes),
+        Err(e) => Err(RpcError::TransportError(e)),
+    }
+}

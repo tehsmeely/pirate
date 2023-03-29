@@ -1,6 +1,7 @@
 use crate::core::RpcName;
 use crate::error::{RpcError, RpcResult};
 
+use crate::transport::TransportError::SerialiseError;
 use crate::{Bytes, OwnedBytes};
 use async_trait::async_trait;
 use log::debug;
@@ -20,6 +21,10 @@ pub enum TransportError {
     ConnectError(String),
     /// Error from timeout after waiting some [Duration].
     ReceiveTimeout(Duration),
+    // Error when serialising data
+    SerialiseError(String),
+    // Error when deserialising data
+    DeserialiseError(String),
 }
 impl std::fmt::Display for TransportError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -28,6 +33,8 @@ impl std::fmt::Display for TransportError {
             TransportError::ReceiveError(s) => write!(f, "ReceiveError({})", s),
             TransportError::ConnectError(s) => write!(f, "ConnectError({})", s),
             TransportError::ReceiveTimeout(dur) => write!(f, "ReceiveTimeout({:?})", dur),
+            TransportError::SerialiseError(s) => write!(f, "SerialiseError({})", s),
+            TransportError::DeserialiseError(s) => write!(f, "DeserialiseError({})", s),
         }
     }
 }
@@ -88,20 +95,20 @@ mod tests {
         let sero = serde_pickle::SerOptions::new();
         let transport_config = TransportWireConfig::Pickle(deo, sero);
 
-        let name_bytes = transport_config.serialize(&name);
-        let query_bytes = transport_config.serialize(&query);
+        let name_bytes = transport_config.serialize(&name).unwrap();
+        let query_bytes = transport_config.serialize(&query).unwrap();
 
         let package = TransportPackage {
             name_bytes: &name_bytes,
             query_bytes: &query_bytes,
         };
 
-        let package_bytes = transport_config.serialize(&package);
+        let package_bytes = transport_config.serialize(&package).unwrap();
 
-        let package2: TransportPackageOwned = transport_config.deserialize(&package_bytes);
+        let package2: TransportPackageOwned = transport_config.deserialize(&package_bytes).unwrap();
 
-        let name2: HelloWorldRpcName = transport_config.deserialize(&package2.name_bytes);
-        let query2: String = transport_config.deserialize(&package2.query_bytes);
+        let name2: HelloWorldRpcName = transport_config.deserialize(&package2.name_bytes).unwrap();
+        let query2: String = transport_config.deserialize(&package2.query_bytes).unwrap();
 
         assert_eq!(name, name2);
         assert_eq!(query, query2);
@@ -159,22 +166,29 @@ pub enum TransportWireConfig {
 
 // TODO: Handle unwraps here with some sort of [Serialise/DeserialiseError]
 impl TransportWireConfig {
-    pub(crate) fn serialize(&self, val: &impl Serialize) -> OwnedBytes {
+    pub(crate) fn serialize(&self, val: &impl Serialize) -> Result<OwnedBytes, TransportError> {
         match self {
-            Self::Pickle(_de_opts, ser_opts) => {
-                serde_pickle::ser::to_vec(val, ser_opts.clone()).unwrap()
-            }
+            Self::Pickle(_de_opts, ser_opts) => serde_pickle::ser::to_vec(val, ser_opts.clone())
+                .map_err(|pickle_error| SerialiseError(format!("{:?}", pickle_error))),
             #[cfg(feature = "transport_postcard")]
-            Self::Postcard => postcard::to_vec(val).unwrap(),
+            Self::Postcard => postcard::to_vec(val)
+                .map_err(|postcard_error| SerialiseError(format!("{:?}", postcard_error))),
         }
     }
-    pub(crate) fn deserialize<T: for<'de> Deserialize<'de>>(&self, bytes: Bytes) -> T {
+    pub(crate) fn deserialize<T: for<'de> Deserialize<'de>>(
+        &self,
+        bytes: Bytes,
+    ) -> Result<T, TransportError> {
         match self {
             Self::Pickle(de_opts, _ser_opts) => {
-                serde_pickle::de::from_slice(bytes, de_opts.clone()).unwrap()
+                serde_pickle::de::from_slice(bytes, de_opts.clone()).map_err(|pickle_error| {
+                    TransportError::DeserialiseError(format!("{:?}", pickle_error))
+                })
             }
             #[cfg(feature = "transport_postcard")]
-            Self::Postcard => postcard::from_bytes(bytes).unwrap(),
+            Self::Postcard => postcard::from_bytes(bytes).map_err(|postcard_error| {
+                TransportError::DeserialiseError(format!("{:?}", postcard_error))
+            }),
         }
     }
 }
@@ -201,12 +215,12 @@ impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
         query_bytes: Bytes<'_>,
         rpc_name: &Name,
     ) -> RpcResult<OwnedBytes> {
-        let name_bytes = self.config.wire_config.serialize(&rpc_name);
+        let name_bytes = self.config.wire_config.serialize(&rpc_name)?;
         let package = TransportPackage {
             name_bytes: &name_bytes,
             query_bytes,
         };
-        let package_bytes = self.config.wire_config.serialize(&package);
+        let package_bytes = self.config.wire_config.serialize(&package)?;
         debug!(
             "Transport sending {} Bytes:  {:?}",
             package_bytes.len(),
@@ -223,8 +237,8 @@ impl<I: InternalTransport, Name: RpcName> Transport<I, Name> {
         match self.internal_transport.receive(None).await {
             Ok(bytes) => {
                 debug!("Transport {} Bytes:  {:?}", bytes.len(), bytes);
-                let package: TransportPackageOwned = self.config.wire_config.deserialize(&bytes);
-                let name = self.config.wire_config.deserialize(&package.name_bytes);
+                let package: TransportPackageOwned = self.config.wire_config.deserialize(&bytes)?;
+                let name = self.config.wire_config.deserialize(&package.name_bytes)?;
                 Ok(ReceivedQuery {
                     name,
                     query_bytes: package.query_bytes,

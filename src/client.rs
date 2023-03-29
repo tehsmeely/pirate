@@ -1,5 +1,5 @@
 use crate::core::{Rpc, RpcName, RpcType};
-use crate::error::{RpcError, RpcResult};
+use crate::error::{into_rpc_result_transport, RpcError, RpcResult};
 use crate::transport::{
     InternalTransport, TcpTransport, Transport, TransportConfig, TransportError,
 };
@@ -22,9 +22,10 @@ impl<'de, Name: RpcName, Q: RpcType, R: RpcType> RpcClient<Name, Q, R> {
         query: Q,
         transport: &mut Transport<impl InternalTransport, Name>,
     ) -> RpcResult<R> {
-        let query_bytes = transport.config.wire_config.serialize(&query);
+        let query_bytes = transport.config.wire_config.serialize(&query)?;
         let result_bytes = transport.send_query(&query_bytes, &self.rpc.name).await?;
-        Ok(transport.config.wire_config.deserialize(&result_bytes))
+        let result = transport.config.wire_config.deserialize(&result_bytes);
+        into_rpc_result_transport(result)
     }
 }
 
