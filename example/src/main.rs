@@ -8,7 +8,7 @@ use tokio;
 #[tokio::main]
 async fn main() {
     let addr = "127.0.0.1:5858";
-    let mut cmd = clap::Command::new("example")
+    let cmd = clap::Command::new("example")
         .bin_name("pirate_example")
         .subcommand_required(true)
         .subcommand(clap::Command::new("server").about("Start the server"))
@@ -43,7 +43,6 @@ async fn main() {
 }
 
 struct ServerState {
-    i: usize,
     names: Vec<String>,
 }
 
@@ -64,10 +63,7 @@ impl std::fmt::Display for RpcId {
 impl RpcName for RpcId {}
 
 async fn server(addr: &str) {
-    let state = ServerState {
-        i: 0,
-        names: Vec::new(),
-    };
+    let state = ServerState { names: Vec::new() };
     let state_ref = Arc::new(Mutex::new(state));
     let transport_config = TransportConfig::default();
     let mut server = RpcServer::new(state_ref, transport_config);
@@ -105,7 +101,7 @@ async fn print_names_cli(addr: &str) {
 
 mod rpcs {
     use crate::{RpcId, ServerState};
-    use pirates::{error::RpcResult, Rpc, RpcDefinition, RpcImpl};
+    use pirates::error::RpcResult;
 
     pub struct AddName {}
     #[pirates::rpc_definition]

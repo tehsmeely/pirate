@@ -1,5 +1,4 @@
 use crate::transport::TransportError;
-use crate::OwnedBytes;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 

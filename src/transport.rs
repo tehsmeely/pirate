@@ -340,14 +340,11 @@ impl InternalTransport for TcpTransport {
             };
             match result {
                 Ok(0) => {
-                    println!("Received 0 bytes, returning");
                     return Ok(return_bytes);
                 }
                 Ok(bytes_received) => {
-                    println!("Received {} bytes", bytes_received);
                     return_bytes.extend_from_slice(&buf[0..bytes_received]);
                     if bytes_received < buf.len() {
-                        println!("Returning because < 1024");
                         return Ok(return_bytes);
                     }
                 }
